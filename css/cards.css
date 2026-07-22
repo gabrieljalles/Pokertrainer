@@ -1,0 +1,31 @@
+/* Visual de cartas de poker e "chip" (badge redondo). Reutilizável por
+   qualquer minigame que precise mostrar cartas ou posições/badges. */
+.chip {
+  position: relative; width: 46px; height: 46px; border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #2E3A35, var(--surface-2) 75%);
+  border: 1.5px solid var(--accent-dim);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--font-mono); font-weight: 700; font-size: 12.5px;
+  color: var(--accent); flex-shrink: 0; letter-spacing: -0.02em;
+}
+.chip::before {
+  content: ''; position: absolute; inset: -5px; border-radius: 50%;
+  background: repeating-conic-gradient(var(--accent-dim) 0deg 7deg, transparent 7deg 18deg);
+  opacity: 0.4; z-index: -1;
+}
+.chip.chip-lg { width: 60px; height: 60px; font-size: 15px; }
+
+.cards-row { display: flex; gap: -10px; }
+.card {
+  width: 92px; height: 130px; background: var(--card-bg); border-radius: 11px;
+  position: relative; box-shadow: 0 8px 20px rgba(0,0,0,0.35);
+  animation: dealCard 0.4s cubic-bezier(.2,.8,.3,1);
+}
+.card:first-child { transform: rotate(-5deg); margin-right: -14px; }
+.card:last-child { transform: rotate(5deg); }
+@keyframes dealCard { from { opacity: 0; transform: translateY(18px) scale(0.92) rotate(0deg); } }
+.card .rank { position: absolute; font-family: var(--font-mono); font-weight: 700; font-size: 18px; line-height: 1; color: var(--card-ink); }
+.card.red .rank, .card.red .suit-big { color: var(--card-red); }
+.card .rank-tl { top: 10px; left: 10px; }
+.card .rank-br { bottom: 10px; right: 10px; transform: rotate(180deg); }
+.card .suit-big { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 34px; color: var(--card-ink); }

@@ -1,0 +1,34 @@
+/* Estilos específicos do minigame "Open Raise" (tela inicial de minigames,
+   status do jogo em andamento e botões de resposta abre/não abre). */
+.minigame-list { display: flex; flex-direction: column; gap: 12px; }
+.minigame-card {
+  display: flex; align-items: center; gap: 14px;
+  background: var(--surface); border: 1px solid var(--border-soft);
+  border-radius: 16px; padding: 16px; text-align: left; color: var(--text);
+  text-decoration: none;
+}
+.minigame-card:active { background: var(--surface-2); }
+.minigame-card.disabled { opacity: 0.45; }
+.minigame-info { flex: 1; min-width: 0; }
+.minigame-info h3 { margin: 0 0 2px; font-size: 16.5px; font-weight: 700; }
+.minigame-info p { margin: 0; font-size: 13px; color: var(--text-muted); line-height: 1.35; }
+.minigame-card .arrow { color: var(--accent); font-size: 18px; flex-shrink: 0; }
+
+.game-status { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.game-status .tag {
+  font-family: var(--font-mono); font-size: 11px; color: var(--text-muted);
+  background: var(--surface); border: 1px solid var(--border-soft);
+  padding: 5px 10px; border-radius: 20px;
+}
+.score-badge {
+  font-family: var(--font-mono); font-size: 13px; color: var(--accent); font-weight: 700;
+}
+
+.answer-row { display: flex; gap: 10px; width: 100%; }
+.answer-btn {
+  flex: 1; padding: 16px 8px; border-radius: 14px; border: 1.5px solid var(--border-soft);
+  background: var(--surface); color: var(--text); font-size: 15px; font-weight: 700;
+}
+.answer-btn:active { transform: scale(0.97); }
+.answer-btn.abre { border-color: var(--success); color: var(--success); }
+.answer-btn.nao { border-color: var(--danger); color: var(--danger); }

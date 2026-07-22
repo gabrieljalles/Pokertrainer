@@ -1,0 +1,82 @@
+/* Estilos específicos do minigame "Showdown" (mesa com N jogadores, board
+   comunitário revelado em duas etapas, seleção do vencedor e cronômetro). */
+.stepper {
+  display: flex; align-items: center; justify-content: center; gap: 18px;
+  background: var(--surface); border: 1px solid var(--border-soft);
+  border-radius: 16px; padding: 18px;
+}
+.stepper-btn {
+  width: 44px; height: 44px; border-radius: 12px; border: 1px solid var(--border-soft);
+  background: var(--surface-2); color: var(--accent); font-size: 20px; font-weight: 700;
+}
+.stepper-btn:active { background: var(--border-soft); }
+.stepper-btn:disabled { opacity: 0.35; }
+.stepper-value { font-family: var(--font-mono); font-size: 32px; font-weight: 700; min-width: 48px; text-align: center; }
+.stepper-hint { text-align: center; font-size: 12.5px; color: var(--text-muted); margin-top: 12px; }
+
+.sd-game-status { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.sd-game-status .tag {
+  font-family: var(--font-mono); font-size: 11px; color: var(--text-muted);
+  background: var(--surface); border: 1px solid var(--border-soft);
+  padding: 5px 10px; border-radius: 20px;
+}
+.sd-timer {
+  font-family: var(--font-mono); font-size: 13px; color: var(--accent); font-weight: 700;
+  background: var(--surface); border: 1px solid var(--border-soft); padding: 5px 10px; border-radius: 20px;
+}
+
+.board-section { text-align: center; margin-bottom: 22px; }
+.board-label {
+  font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase;
+  color: var(--text-faint); margin-bottom: 10px;
+}
+.board-row { display: flex; justify-content: center; gap: 8px; }
+.board-row .card { width: 56px; height: 78px; }
+.board-row .card .rank { font-size: 12px; }
+.board-row .card .rank-tl { top: 5px; left: 5px; }
+.board-row .card .rank-br { bottom: 5px; right: 5px; }
+.board-row .card .suit-big { font-size: 20px; }
+.board-row .card.back, .card-slot.back {
+  background: repeating-linear-gradient(135deg, var(--surface-2) 0 6px, var(--border-soft) 6px 12px);
+  border: 1px solid var(--border-soft); box-shadow: none;
+}
+
+.waiting-note { text-align: center; color: var(--text-muted); font-size: 13px; margin-top: 4px; }
+
+.players-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 10px;
+}
+.player-slot {
+  background: var(--surface); border: 1.5px solid var(--border-soft); border-radius: 14px;
+  padding: 10px; display: flex; flex-direction: column; align-items: center; gap: 8px;
+  text-align: center;
+}
+.player-slot .p-label {
+  font-family: var(--font-mono); font-size: 11px; color: var(--text-muted); font-weight: 700;
+  letter-spacing: 0.04em;
+}
+.player-slot .p-cards { display: flex; gap: 4px; }
+.player-slot .p-cards .card { width: 48px; height: 68px; }
+.player-slot .p-cards .card .rank { font-size: 11px; }
+.player-slot .p-cards .card .rank-tl { top: 4px; left: 4px; }
+.player-slot .p-cards .card .rank-br { bottom: 4px; right: 4px; }
+.player-slot .p-cards .card .suit-big { font-size: 18px; }
+button.player-slot { border: 1.5px solid var(--border-soft); }
+button.player-slot:active { background: var(--surface-2); }
+.player-slot.winner { border-color: var(--success); background: var(--success-bg); }
+.player-slot.picked-wrong { border-color: var(--danger); background: var(--danger-bg); }
+.player-slot .p-hand-name { font-size: 11px; color: var(--text-muted); }
+.player-slot.winner .p-hand-name { color: var(--success); font-weight: 600; }
+
+.sd-feedback-panel {
+  width: 100%; border-radius: 16px; padding: 16px; text-align: center;
+  border: 1.5px solid var(--border-soft); margin-top: 18px; animation: fadeIn 0.2s ease-out;
+}
+.sd-feedback-panel.correct { background: var(--success-bg); border-color: var(--success); }
+.sd-feedback-panel.wrong { background: var(--danger-bg); border-color: var(--danger); }
+.sd-feedback-panel .fb-title { font-size: 17px; font-weight: 700; margin-bottom: 4px; }
+.sd-feedback-panel.correct .fb-title { color: var(--success); }
+.sd-feedback-panel.wrong .fb-title { color: var(--danger); }
+.sd-feedback-panel .fb-detail { font-size: 13px; color: var(--text-muted); }
+.sd-feedback-panel .fb-detail b { color: var(--text); font-family: var(--font-mono); }
+.sd-feedback-panel .fb-time { margin-top: 6px; font-family: var(--font-mono); font-size: 13px; color: var(--accent); }
