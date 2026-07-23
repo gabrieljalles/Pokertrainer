@@ -4,8 +4,10 @@
 (function () {
   "use strict";
 
-  var HISTORY_STORAGE_KEY = 'rt_showdown_history_v1';
+  var HISTORY_STORAGE_KEY_WINNER = 'rt_showdown_history_winner_v1';
+  var HISTORY_STORAGE_KEY_HAND = 'rt_showdown_history_hand_v1';
   var MAX_PLAYERS_STORAGE_KEY = 'rt_showdown_maxplayers_v1';
+  var GAME_MODE_STORAGE_KEY = 'rt_showdown_gamemode_v1';
   var REVEAL_DELAY_MS = 3000;
 
   var Storage = RT.storage;
@@ -19,8 +21,9 @@
   var tickTimer = null;
   var roundId = 0;
 
-  function loadHistory() {
-    var raw = Storage.get(HISTORY_STORAGE_KEY);
+  function loadHistory(mode) {
+    var key = mode === 'hand' ? HISTORY_STORAGE_KEY_HAND : HISTORY_STORAGE_KEY_WINNER;
+    var raw = Storage.get(key);
     if (!raw) return [];
     try { var arr = JSON.parse(raw); return Array.isArray(arr) ? arr : []; } catch (e) { return []; }
   }
@@ -31,17 +34,25 @@
     return (n >= 2 && n <= 9) ? n : 5;
   }
 
+  function loadGameMode() {
+    var raw = Storage.get(GAME_MODE_STORAGE_KEY);
+    return (raw === 'hand') ? 'hand' : 'winner';
+  }
+
+  var gameMode = loadGameMode();
   var state = {
     screen: 'config',
     maxPlayers: loadMaxPlayers(),
+    gameMode: gameMode,
     session: { total: 0, correct: 0 },
     round: null,
-    history: loadHistory()
+    history: loadHistory(gameMode)
   };
 
   function recordAttempt(record) {
     state.history.push(record);
-    Storage.set(HISTORY_STORAGE_KEY, JSON.stringify(state.history));
+    var key = state.gameMode === 'hand' ? HISTORY_STORAGE_KEY_HAND : HISTORY_STORAGE_KEY_WINNER;
+    Storage.set(key, JSON.stringify(state.history));
   }
 
   function randBetween(min, max) { return min + Math.floor(Math.random() * (max - min + 1)); }
@@ -74,6 +85,7 @@
       phase: 'flop',
       revealAt: null,
       picked: null,
+      selectedCards: [],
       elapsedMs: null
     };
     render();
@@ -105,9 +117,62 @@
     if (tickTimer) { clearInterval(tickTimer); tickTimer = null; }
   }
 
+  function toggleCardSelection(cardKey) {
+    var round = state.round;
+    if (!round || round.phase !== 'showdown') return;
+
+    var idx = round.selectedCards.indexOf(cardKey);
+    if (idx !== -1) {
+      round.selectedCards.splice(idx, 1);
+    } else if (round.selectedCards.length < 5) {
+      round.selectedCards.push(cardKey);
+      if (round.selectedCards.length === 5) {
+        finishHandSelection();
+      }
+    }
+    render();
+  }
+
+  function finishHandSelection() {
+    var round = state.round;
+    if (!round || round.selectedCards.length !== 5) return;
+    stopTick();
+    round.elapsedMs = Date.now() - round.revealAt;
+    round.phase = 'result';
+
+    var selectedCards = round.selectedCards.map(function (key) {
+      if (key.startsWith('board-')) {
+        var cardIndex = parseInt(key.split('-')[1], 10);
+        return round.board[cardIndex];
+      } else if (key.startsWith('player-')) {
+        var parts = key.split('-');
+        var playerId = parseInt(parts[1], 10);
+        var privateIndex = parseInt(parts[2], 10);
+        return round.hands[playerId][privateIndex];
+      }
+    });
+
+    var selectedScore = Eval.evaluate5(selectedCards);
+    var bestWinnerScore = round.scores[round.winners[0]];
+    var correct = Eval.compareScore(selectedScore, bestWinnerScore) === 0;
+
+    round.picked = correct;
+    state.session.total++;
+    if (correct) state.session.correct++;
+    recordAttempt({
+      ts: Date.now(),
+      numPlayers: round.numPlayers,
+      correct: correct,
+      mode: 'hand',
+      elapsedMs: round.elapsedMs
+    });
+    render();
+  }
+
   function handlePick(index) {
     var round = state.round;
     if (!round || round.phase !== 'showdown') return;
+    if (state.gameMode === 'hand') return;
     stopTick();
     round.picked = index;
     round.elapsedMs = Date.now() - round.revealAt;
@@ -120,6 +185,7 @@
       numPlayers: round.numPlayers,
       correct: correct,
       tie: round.winners.length > 1,
+      mode: 'winner',
       elapsedMs: round.elapsedMs
     });
     render();
@@ -140,10 +206,22 @@
   /* ================= Render ================= */
   function renderConfig() {
     var html = '<div class="screen">';
+    html += UI.topbar('Showdown', 'go-back');
     html += '<div class="hero">' +
       '<p class="eyebrow">Treino Pós-Flop</p>' +
       '<h1>Showdown</h1>' +
-      '<p class="sub">Veja o flop, depois o board e as mãos completas: quem venceu?</p>' +
+      '<p class="sub">Treino de avaliação de mãos de poker</p>' +
+      '</div>';
+    html += '<p class="section-label">Tipo de jogo</p>';
+    html += '<div class="game-mode-selector">' +
+      '<button class="mode-btn ' + (state.gameMode === 'winner' ? 'active' : '') + '" data-action="set-game-mode" data-mode="winner">' +
+        '<div class="mode-title">👁️ Quem venceu?</div>' +
+        '<div class="mode-desc">Veja o board completo e escolha quem ganhou a mão.</div>' +
+      '</button>' +
+      '<button class="mode-btn ' + (state.gameMode === 'hand' ? 'active' : '') + '" data-action="set-game-mode" data-mode="hand">' +
+        '<div class="mode-title">🎯 Melhor mão</div>' +
+        '<div class="mode-desc">Selecione as 5 melhores cartas entre suas 7 cartas.</div>' +
+      '</button>' +
       '</div>';
     html += '<p class="section-label">Quantos jogadores (máximo)?</p>';
     html += '<div class="stepper">' +
@@ -196,10 +274,58 @@
     return html;
   }
 
+  function renderHandSelection(round) {
+    var html = '<div class="hand-selection-area">';
+    var selected = round.selectedCards.length;
+    html += '<p class="selection-counter">Selecionadas: ' + selected + '/5</p>';
+
+    html += '<div class="board-selection">';
+    html += '<span class="board-section-title">Board (Comunitárias)</span>';
+    html += '<div class="cards-grid-row">';
+    for (var b = 0; b < round.board.length; b++) {
+      var boardKey = 'board-' + b;
+      var isBoardSelected = round.selectedCards.indexOf(boardKey) !== -1;
+      html += '<button class="card-btn ' + (isBoardSelected ? 'selected' : '') + '" data-action="toggle-card" data-card-key="' + boardKey + '" ' +
+              (round.phase !== 'showdown' ? 'disabled' : '') + '>';
+      html += UI.renderCard(round.board[b]);
+      html += '</button>';
+    }
+    html += '</div>';
+    html += '</div>';
+
+    html += '<div class="players-selection-grid">';
+    for (var p = 0; p < round.numPlayers; p++) {
+      var isWinner = round.winners.indexOf(p) !== -1;
+      var showWinner = round.phase === 'result' && isWinner;
+      var playerClass = showWinner ? 'player-hand winner-hand' : 'player-hand';
+
+      html += '<div class="' + playerClass + '">';
+      html += '<span class="player-name">Jogador ' + (p + 1) + (showWinner ? ' (VENCEDOR)' : '') + '</span>';
+      html += '<div class="cards-grid-row">';
+
+      for (var i = 0; i < 2; i++) {
+        var playerKey = 'player-' + p + '-' + i;
+        var isPlayerSelected = round.selectedCards.indexOf(playerKey) !== -1;
+        html += '<button class="card-btn private ' + (isPlayerSelected ? 'selected' : '') + '" data-action="toggle-card" data-card-key="' + playerKey + '" ' +
+                (round.phase !== 'showdown' ? 'disabled' : '') + '>';
+        html += UI.renderCard(round.hands[p][i]);
+        html += '</button>';
+      }
+
+      html += '</div>';
+      html += '</div>';
+    }
+    html += '</div>';
+
+    html += '</div>';
+    return html;
+  }
+
   function renderGame() {
     var round = state.round;
     var html = '<div class="screen">';
     html += '<div class="sd-game-status">' +
+      '<span class="tag">' + (state.gameMode === 'hand' ? 'Melhor mão' : 'Quem venceu?') + '</span>' +
       '<span class="tag">' + round.numPlayers + ' jogadores</span>' +
       '<span class="score-badge">' + state.session.correct + '/' + state.session.total + (state.session.total ? ' · ' + pct(state.session.correct, state.session.total) + '%' : '') + '</span>';
     if (round.phase === 'showdown') html += '<span class="sd-timer" id="sd-live-timer">0.0s</span>';
@@ -211,20 +337,32 @@
 
     if (round.phase === 'flop') {
       html += '<p class="waiting-note">Revelando o restante do board e as mãos em instantes…</p>';
+    } else if (state.gameMode === 'hand') {
+      html += '<p class="section-label">' + (round.phase === 'showdown' ? 'Qual é a melhor mão? Selecione 5 cartas' : 'Resultado') + '</p>';
+      html += renderHandSelection(round);
     } else {
       html += '<p class="section-label">' + (round.phase === 'showdown' ? 'Quem venceu?' : 'Resultado') + '</p>';
+      html += renderPlayers(round);
     }
 
-    html += renderPlayers(round);
-
     if (round.phase === 'result') {
-      var correct = round.winners.indexOf(round.picked) !== -1;
-      var winnerNames = round.winners.map(function (w) { return 'Jogador ' + (w + 1); }).join(' e ');
-      html += '<div class="sd-feedback-panel ' + (correct ? 'correct' : 'wrong') + '">' +
-        '<div class="fb-title">' + (correct ? '✅ Correto!' : '❌ Errado') + '</div>' +
-        '<div class="fb-detail">' + (round.winners.length > 1 ? 'Mão dividida: ' : 'Vencedor: ') + '<b>' + esc(winnerNames) + '</b> · <b>' + esc(Eval.categoryName(round.scores[round.winners[0]])) + '</b></div>' +
-        '<div class="fb-time">Tempo de resposta: ' + (round.elapsedMs / 1000).toFixed(1) + 's</div>' +
-        '</div>';
+      if (state.gameMode === 'hand') {
+        var correct = round.picked;
+        var winnerNames = round.winners.map(function (w) { return 'Jogador ' + (w + 1); }).join(' e ');
+        html += '<div class="sd-feedback-panel ' + (correct ? 'correct' : 'wrong') + '">' +
+          '<div class="fb-title">' + (correct ? '✅ Correto!' : '❌ Errado') + '</div>' +
+          '<div class="fb-detail">' + (round.winners.length > 1 ? 'Melhor(es) mão: ' : 'Melhor mão: ') + '<b>' + esc(winnerNames) + '</b> · <b>' + esc(Eval.categoryName(round.scores[round.winners[0]])) + '</b></div>' +
+          '<div class="fb-time">Tempo de resposta: ' + (round.elapsedMs / 1000).toFixed(1) + 's</div>' +
+          '</div>';
+      } else {
+        var correct = round.winners.indexOf(round.picked) !== -1;
+        var winnerNames = round.winners.map(function (w) { return 'Jogador ' + (w + 1); }).join(' e ');
+        html += '<div class="sd-feedback-panel ' + (correct ? 'correct' : 'wrong') + '">' +
+          '<div class="fb-title">' + (correct ? '✅ Correto!' : '❌ Errado') + '</div>' +
+          '<div class="fb-detail">' + (round.winners.length > 1 ? 'Mão dividida: ' : 'Vencedor: ') + '<b>' + esc(winnerNames) + '</b> · <b>' + esc(Eval.categoryName(round.scores[round.winners[0]])) + '</b></div>' +
+          '<div class="fb-time">Tempo de resposta: ' + (round.elapsedMs / 1000).toFixed(1) + 's</div>' +
+          '</div>';
+      }
       html += '<button class="btn-primary" data-action="next-hand">Próxima mão →</button>';
     }
 
@@ -236,8 +374,10 @@
   function renderStats() {
     var html = '<div class="screen">';
     html += UI.topbar('Histórico · Showdown', 'go-home');
+    var modeName = state.gameMode === 'hand' ? 'Melhor mão' : 'Quem venceu?';
+    html += '<div class="stat-mode-label">Modo: <strong>' + modeName + '</strong></div>';
     if (state.history.length === 0) {
-      html += '<div class="empty-state"><div class="big-icon">🃏</div>Você ainda não jogou nenhum showdown.</div></div>';
+      html += '<div class="empty-state"><div class="big-icon">🃏</div>Nenhum resultado neste modo ainda.</div></div>';
       return html;
     }
     var stats = computeStats(state.history);
@@ -268,6 +408,7 @@
     var action = el.getAttribute('data-action');
 
     if (action === 'go-home') { clearTimers(); state.screen = 'config'; render(); }
+    else if (action === 'go-back') { clearTimers(); window.location.href = 'index.html'; }
     else if (action === 'go-stats') { state.screen = 'stats'; render(); }
     else if (action === 'inc-players') {
       state.maxPlayers = Math.min(9, state.maxPlayers + 1);
@@ -279,6 +420,13 @@
       Storage.set(MAX_PLAYERS_STORAGE_KEY, String(state.maxPlayers));
       render();
     }
+    else if (action === 'set-game-mode') {
+      var mode = el.getAttribute('data-mode');
+      state.gameMode = mode;
+      state.history = loadHistory(mode);
+      Storage.set(GAME_MODE_STORAGE_KEY, mode);
+      render();
+    }
     else if (action === 'start-session') {
       state.session = { total: 0, correct: 0 };
       state.screen = 'game';
@@ -287,14 +435,20 @@
     else if (action === 'pick-winner') {
       handlePick(parseInt(el.getAttribute('data-index'), 10));
     }
+    else if (action === 'toggle-card') {
+      var cardKey = el.getAttribute('data-card-key');
+      toggleCardSelection(cardKey);
+    }
     else if (action === 'next-hand') {
       dealNewHand();
     }
     else if (action === 'end-session') { clearTimers(); state.screen = 'config'; render(); }
     else if (action === 'clear-history') {
-      if (confirm('Tem certeza que deseja apagar todo o histórico do Showdown?')) {
+      var modeName = state.gameMode === 'hand' ? 'Melhor mão' : 'Quem venceu?';
+      if (confirm('Tem certeza que deseja apagar o histórico de "' + modeName + '"?')) {
         state.history = [];
-        Storage.remove(HISTORY_STORAGE_KEY);
+        var key = state.gameMode === 'hand' ? HISTORY_STORAGE_KEY_HAND : HISTORY_STORAGE_KEY_WINNER;
+        Storage.remove(key);
         render();
       }
     }

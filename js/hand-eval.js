@@ -76,11 +76,26 @@ RT.handEval = (function () {
     return best;
   }
 
+  function evaluateBest7WithCards(cards7) {
+    var best = null;
+    var bestCombo = null;
+    for (var i = 0; i < COMBOS_7_5.length; i++) {
+      var combo = COMBOS_7_5[i].map(function (idx) { return cards7[idx]; });
+      var score = evaluate5(combo);
+      if (!best || compareScore(score, best) > 0) {
+        best = score;
+        bestCombo = COMBOS_7_5[i];
+      }
+    }
+    return { score: best, cardIndices: bestCombo };
+  }
+
   function categoryName(score) { return CATEGORY_NAMES[score[0]]; }
 
   return {
     evaluate5: evaluate5,
     evaluateBest7: evaluateBest7,
+    evaluateBest7WithCards: evaluateBest7WithCards,
     compareScore: compareScore,
     categoryName: categoryName
   };
