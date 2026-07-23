@@ -206,7 +206,6 @@
   /* ================= Render ================= */
   function renderConfig() {
     var html = '<div class="screen">';
-    html += UI.topbar('Showdown', 'go-back');
     html += '<div class="hero">' +
       '<p class="eyebrow">Treino Pós-Flop</p>' +
       '<h1>Showdown</h1>' +
@@ -232,7 +231,10 @@
     html += '<p class="stepper-hint">Cada mão sorteia aleatoriamente entre 2 e ' + state.maxPlayers + ' jogadores na mesa.</p>';
     html += '<div class="spacer"></div>';
     html += '<button class="btn-primary" data-action="start-session">Iniciar showdown</button>';
-    html += '<div class="home-footer"><button class="btn-secondary" data-action="go-stats">📊 Histórico</button></div>';
+    html += '<div class="home-footer">' +
+      '<button class="btn-secondary" data-action="go-stats">📊 Histórico</button>' +
+      '<button class="btn-secondary" data-action="go-home">← Menu</button>' +
+      '</div>';
     html += '</div>';
     return html;
   }
@@ -373,7 +375,10 @@
 
   function renderStats() {
     var html = '<div class="screen">';
-    html += UI.topbar('Histórico · Showdown', 'go-home');
+    html += '<div class="hero">' +
+      '<p class="eyebrow">Histórico de Treino</p>' +
+      '<h1>Showdown</h1>' +
+      '</div>';
     var modeName = state.gameMode === 'hand' ? 'Melhor mão' : 'Quem venceu?';
     html += '<div class="stat-mode-label">Modo: <strong>' + modeName + '</strong></div>';
     if (state.history.length === 0) {
@@ -386,6 +391,7 @@
       '<div class="big-label">' + stats.overall.correct + ' de ' + stats.overall.total + ' acertos · Tempo médio ' + stats.avgSeconds.toFixed(1) + 's</div>' +
       '</div>';
     html += '<button class="danger-link" data-action="clear-history">Limpar histórico</button>';
+    html += '<div class="home-footer"><button class="btn-secondary" data-action="go-home">← Voltar ao Menu</button></div>';
     html += '</div>';
     return html;
   }
@@ -407,7 +413,7 @@
     if (!el || el.hasAttribute('disabled')) return;
     var action = el.getAttribute('data-action');
 
-    if (action === 'go-home') { clearTimers(); state.screen = 'config'; render(); }
+    if (action === 'go-home') { clearTimers(); window.location.href = 'index.html'; }
     else if (action === 'go-back') { clearTimers(); window.location.href = 'index.html'; }
     else if (action === 'go-stats') { state.screen = 'stats'; render(); }
     else if (action === 'inc-players') {

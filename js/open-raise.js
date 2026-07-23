@@ -34,7 +34,7 @@
 
   /* ================= Estado ================= */
   var state = {
-    screen: 'home',
+    screen: 'config',
     rangesData: Ranges.loadRangesData(window.RT_DEFAULT_RANGES),
     selectedTipo: null,
     selectedBlindIds: [],
@@ -148,7 +148,6 @@
   /* ---------- Config ---------- */
   function renderConfig() {
     var html = '<div class="screen">';
-    html += UI.topbar('Open Raise · Config', 'go-home');
 
     var tipos = Ranges.listTipos(state.rangesData);
     html += '<p class="section-label">Você estuda Cash ou Torneio?</p><div class="option-list">';
@@ -199,6 +198,11 @@
     html += '<div class="spacer"></div>';
     var canStart = state.selectedBlindIds.length > 0 && state.selectedPositions.length > 0;
     html += '<button class="btn-primary" data-action="start-session" ' + (canStart ? '' : 'disabled') + '>Iniciar treino</button>';
+    html += '<div class="home-footer">' +
+      '<button class="btn-secondary" data-action="go-stats">📊 Histórico</button>' +
+      '<button class="btn-secondary" data-action="go-import">⚙️ Ranges</button>' +
+      '<button class="btn-secondary" data-action="go-home">← Menu</button>' +
+      '</div>';
     html += '</div>';
     return html;
   }
@@ -243,7 +247,10 @@
   /* ---------- Stats ---------- */
   function renderStats() {
     var html = '<div class="screen">';
-    html += UI.topbar('Histórico', 'go-home');
+    html += '<div class="hero">' +
+      '<p class="eyebrow">Histórico de Treino</p>' +
+      '<h1>Open Raise</h1>' +
+      '</div>';
 
     if (state.history.length === 0) {
       html += '<div class="empty-state"><div class="big-icon">🃏</div>Você ainda não jogou nenhuma mão.<br>Comece um treino para ver suas estatísticas aqui.</div>';
@@ -287,6 +294,7 @@
     html += '</div></details>';
 
     html += '<button class="danger-link" data-action="clear-history">Limpar histórico</button>';
+    html += '<div class="home-footer"><button class="btn-secondary" data-action="go-home">← Voltar ao Menu</button></div>';
     html += '</div>';
     return html;
   }
@@ -295,7 +303,10 @@
   function renderImport() {
     var usingCustom = Ranges.isUsingCustomRanges();
     var html = '<div class="screen">';
-    html += UI.topbar('Ranges', 'go-home');
+    html += '<div class="hero">' +
+      '<p class="eyebrow">Configuração</p>' +
+      '<h1>Ranges</h1>' +
+      '</div>';
     html += '<div class="info-box">Edite o arquivo <code>ranges_aberturas.json</code> com seus próprios ranges e importe abaixo. ' +
       'Formato esperado: <code>{"blinds":[{"id":"...","nome":"...","posicoes":{"UTG":["AA","AKs",...]}}]}</code>.</div>';
 
@@ -314,6 +325,7 @@
     if (state.importMessage) {
       html += '<div class="toast ' + state.importMessage.type + '">' + esc(state.importMessage.text) + '</div>';
     }
+    html += '<div class="home-footer"><button class="btn-secondary" data-action="go-config">← Voltar</button></div>';
     html += '</div>';
     return html;
   }
@@ -339,7 +351,7 @@
     var action = el.getAttribute('data-action');
 
     if (action === 'go-config') { state.screen = 'config'; render(); }
-    else if (action === 'go-home') { state.screen = 'home'; state.importMessage = null; render(); }
+    else if (action === 'go-home') { window.location.href = 'index.html'; }
     else if (action === 'go-stats') { state.screen = 'stats'; render(); }
     else if (action === 'go-import') { state.screen = 'import'; state.importMessage = null; render(); }
     else if (action === 'toggle-all-positions') {

@@ -4,15 +4,87 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#12181A">
-<meta http-equiv="refresh" content="0; url=treino_open_raise.html">
 <title>Range Trainer</title>
+<link rel="stylesheet" href="css/base.css">
 <style>
-  html, body { margin: 0; height: 100%; background: #10161A; color: #EDEAE1; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-  body { display: flex; align-items: center; justify-content: center; }
-  a { color: #D8B475; }
+  .hero {
+    text-align: center; margin-bottom: 32px;
+  }
+  .hero .eyebrow {
+    font-family: var(--font-mono); font-size: 11px; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--text-muted); margin-bottom: 8px;
+  }
+  .hero h1 {
+    font-size: 36px; font-weight: 700; margin: 8px 0; color: var(--text);
+  }
+  .hero .sub {
+    font-size: 14px; color: var(--text-muted); line-height: 1.6;
+  }
+
+  .minigames-grid {
+    display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 24px;
+  }
+  .minigame-card {
+    background: var(--surface); border: 1.5px solid var(--border-soft); border-radius: 14px;
+    padding: 18px; text-decoration: none; color: inherit; cursor: pointer;
+    transition: all 0.2s ease; display: flex; flex-direction: column; gap: 10px;
+  }
+  .minigame-card:hover {
+    border-color: var(--accent); background: var(--surface-2);
+  }
+  .minigame-card:active {
+    transform: scale(0.98);
+  }
+  .card-icon {
+    font-size: 32px; line-height: 1;
+  }
+  .card-title {
+    font-size: 14px; font-weight: 700; color: white;
+  }
+  .card-desc {
+    font-size: 11px; color: var(--text-muted); line-height: 1.4;
+  }
+
+  .screen {
+    max-width: 480px; margin: 0 auto; padding: 0 16px;
+  }
+
+  @media (max-width: 768px) {
+    .minigames-grid { grid-template-columns: 1fr; }
+    .hero h1 { font-size: 28px; }
+  }
 </style>
 </head>
 <body>
-<p>Carregando… se nada acontecer, <a href="treino_open_raise.html">clique aqui</a>.</p>
+<div class="screen">
+  <div style="height: 20px;"></div>
+  <div class="hero">
+    <p class="eyebrow">Ferramentas de Treinamento</p>
+    <h1>Range Trainer</h1>
+    <p class="sub">Treino de poker com análise de ranges e classificação de boards</p>
+  </div>
+
+  <div class="minigames-grid">
+    <a href="treino_open_raise.html" class="minigame-card">
+      <div class="card-icon">📈</div>
+      <div class="card-title">Open Raise</div>
+      <div class="card-desc">Aprenda ranges de abertura pré-flop</div>
+    </a>
+
+    <a href="treino_showdown.html" class="minigame-card">
+      <div class="card-icon">🃏</div>
+      <div class="card-title">Showdown</div>
+      <div class="card-desc">Treino de avaliação de mãos</div>
+    </a>
+
+    <a href="treino_boards.html" class="minigame-card">
+      <div class="card-icon">📊</div>
+      <div class="card-title">Board Classification</div>
+      <div class="card-desc">Reconhecimento de texturas pós-flop</div>
+    </a>
+  </div>
+
+  <div style="height: 40px;"></div>
+</div>
 </body>
 </html>
