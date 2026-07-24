@@ -26,7 +26,10 @@ window.RT_DEFAULT_RANGES = {
         UTG: {
           open_range: {
             diferencaVsAnterior: null, // posição mais tight, não há "anterior" pra comparar
-            range: [
+            raise_range: [],
+            call_range: [],
+            fold_range: [],
+            allin_range: [
               "AA",
               "AKs",
               "AQs",
@@ -61,87 +64,6 @@ window.RT_DEFAULT_RANGES = {
               "TT",
               "T9s",
               "A9o",
-              "99",
-              "98s",
-              "88",
-              "77",
-              "66",
-              "55",
-              "44",
-              "33",
-              "22",
-            ],
-          },
-          vs_openraise_range: {
-            diferencaVsAnterior: {
-              comparadoCom: null,
-              adicionadas: [],
-              removidas: [],
-            },
-            range: [],
-          },
-          vs_3bet_range: {
-            diferencaVsAnterior: {
-              comparadoCom: null,
-              adicionadas: [],
-              removidas: [],
-            },
-            range: [],
-          },
-          vs_openshove_range: {
-            diferencaVsAnterior: {
-              comparadoCom: null,
-              adicionadas: [],
-              removidas: [],
-            },
-            range: [],
-          },
-        },
-        UTG1: {
-          open_range: {
-            diferencaVsAnterior: {
-              comparadoCom: "UTG",
-              adicionadas: ["QJo", "A8o", "A7o"],
-              removidas: [],
-            },
-            range: [
-              "AA",
-              "AKs",
-              "AQs",
-              "AJs",
-              "ATs",
-              "A9s",
-              "A8s",
-              "A7s",
-              "A6s",
-              "A5s",
-              "A4s",
-              "A3s",
-              "A2s",
-              "AKo",
-              "KK",
-              "KQs",
-              "KJs",
-              "KTs",
-              "K9s",
-              "AQo",
-              "KQo",
-              "QQ",
-              "QJs",
-              "QTs",
-              "Q9s",
-              "AJo",
-              "KJo",
-              "QJo",
-              "JJ",
-              "JTs",
-              "J9s",
-              "ATo",
-              "TT",
-              "T9s",
-              "A9o",
-              "A8o",
-              "A7o",
               "99",
               "98s",
               "88",
@@ -185,7 +107,10 @@ window.RT_DEFAULT_RANGES = {
               adicionadas: ["T8s", "KTo", "A6o", "A5o", "A4o"],
               removidas: [],
             },
-            range: [
+            raise_range: [],
+            call_range: [],
+            fold_range: [],
+            allin_range: [
               "AA",
               "AKs",
               "AQs",
@@ -271,7 +196,10 @@ window.RT_DEFAULT_RANGES = {
               adicionadas: ["K8s", "K7s", "QTo", "JTo", "A3o", "A2o"],
               removidas: [],
             },
-            range: [
+            raise_range: [],
+            call_range: [],
+            fold_range: [],
+            allin_range: [
               "AA",
               "AKs",
               "AQs",
@@ -372,7 +300,10 @@ window.RT_DEFAULT_RANGES = {
               ],
               removidas: [],
             },
-            range: [
+            raise_range: [],
+            call_range: [],
+            fold_range: [],
+            allin_range: [
               "AA",
               "AKs",
               "AQs",
@@ -493,7 +424,10 @@ window.RT_DEFAULT_RANGES = {
               ],
               removidas: [],
             },
-            range: [
+            raise_range: [],
+            call_range: [],
+            fold_range: [],
+            allin_range: [
               "AA",
               "AKs",
               "AQs",
@@ -610,12 +544,12 @@ window.RT_DEFAULT_RANGES = {
           open_range: {
             diferencaVsAnterior: {
               comparadoCom: "BTN",
-              adicionadas: [], // TODO
+              adicionadas: [],
               removidas: [],
             },
-            range: [],
-            not_range: [
-              "95o",
+            raise_range: [],
+            call_range: [],
+            fold_range: ["95o",
               "85o",
               "75o",
               "65o",
@@ -635,8 +569,10 @@ window.RT_DEFAULT_RANGES = {
               "62o",
               "52o",
               "42o",
-              "32o",
-            ],
+              "32o"],
+            range: [],
+            callin_range: [],
+            allin_range: [],
           },
           vs_openraise_range: {
             diferencaVsAnterior: {

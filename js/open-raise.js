@@ -39,6 +39,8 @@
     selectedTipo: null,
     selectedBlindIds: [],
     selectedPositions: [],
+    selectedGameMode: 'open_range',
+    expandedBlindId: null,
     session: { total: 0, correct: 0 },
     currentRound: null,
     lastResult: null,
@@ -49,6 +51,44 @@
   function recordAttempt(record) {
     state.history.push(record);
     Storage.set(HISTORY_STORAGE_KEY, JSON.stringify(state.history));
+  }
+
+  function getCorrectAction(rangesData, blindId, position, handClass, gameMode) {
+    gameMode = gameMode || 'open_range';
+    var blind = Ranges.findBlind(rangesData, blindId);
+    if (!blind || !blind.posicoes[position]) {
+      return 'fold';
+    }
+
+    var rangeKey;
+    if (gameMode === 'open_range') {
+      rangeKey = 'open_range';
+    } else if (gameMode === 'vs_openraise') {
+      rangeKey = 'vs_openraise_range';
+    } else if (gameMode === 'vs_3bet') {
+      rangeKey = 'vs_3bet_range';
+    } else if (gameMode === 'vs_openshove') {
+      rangeKey = 'vs_openshove_range';
+    }
+
+    var posData = blind.posicoes[position][rangeKey];
+    if (!posData) {
+      return 'fold';
+    }
+
+    if (posData.allin_range && posData.allin_range.indexOf(handClass) !== -1) {
+      return 'allin';
+    }
+    if (posData.raise_range && posData.raise_range.indexOf(handClass) !== -1) {
+      return 'raise';
+    }
+    if (posData.call_range && posData.call_range.indexOf(handClass) !== -1) {
+      return 'call';
+    }
+    if (posData.range && posData.range.indexOf(handClass) !== -1) {
+      return 'raise';
+    }
+    return 'fold';
   }
 
   function dealNewHand() {
@@ -63,7 +103,7 @@
     var choice = candidates[Math.floor(Math.random() * candidates.length)];
     var pair = Cards.dealTwoCards();
     var handClass = Cards.getHandClass(pair[0], pair[1]);
-    var correctAnswer = Ranges.isInRange(state.rangesData, choice.blindId, choice.position, handClass) ? 'abre' : 'nao_abre';
+    var correctAnswer = getCorrectAction(state.rangesData, choice.blindId, choice.position, handClass, state.selectedGameMode);
     state.currentRound = {
       blindId: choice.blindId, blindNome: choice.blindNome, position: choice.position,
       c1: pair[0], c2: pair[1], handClass: handClass, correctAnswer: correctAnswer
@@ -124,7 +164,7 @@
       '<div class="minigame-list">' +
         '<button class="minigame-card" data-action="go-config">' +
           '<div class="chip">OR</div>' +
-          '<div class="minigame-info"><h3>Open Raise</h3><p>Duas cartas na mão: você abre ou não abre nessa posição?</p></div>' +
+          '<div class="minigame-info"><h3>Open Raise</h3><p>Duas cartas na mão: qual é a ação correta? All-in, Raise, Call ou Fold?</p></div>' +
           '<span class="arrow">→</span>' +
         '</button>' +
         '<a class="minigame-card" href="treino_showdown.html">' +
@@ -168,12 +208,29 @@
       for (var i = 0; i < blinds.length; i++) {
         var b = blinds[i];
         var sel = state.selectedBlindIds.indexOf(b.id) !== -1;
-        html += '<label class="option-row' + (sel ? ' selected' : '') + '">' +
+        var expanded = state.expandedBlindId === b.id;
+        html += '<div class="blind-option-wrapper">' +
+          '<label class="option-row' + (sel ? ' selected' : '') + '">' +
           '<input type="checkbox" value="' + esc(b.id) + '" data-action="toggle-blind" ' + (sel ? 'checked' : '') + '>' +
           '<span class="check-box"></span>' +
           '<span class="option-text"><div class="t1">' + esc(b.nome) + '</div>' +
           (b.descricao ? '<div class="t2">' + esc(b.descricao) + '</div>' : '') + '</span>' +
+          '<button class="info-btn" data-action="toggle-blind-info" data-blind-id="' + esc(b.id) + '" type="button">i</button>' +
           '</label>';
+
+        if (expanded && (b.why || b.todo || b.nottodo)) {
+          html += '<div class="blind-info-panel">' +
+            (b.why ? '<div class="info-section"><strong>Por quê?</strong><p>' + esc(b.why) + '</p></div>' : '') +
+            (b.todo ? '<div class="info-section"><strong>O que fazer:</strong><ul>' +
+              b.todo.map(function(t) { return '<li>' + esc(t) + '</li>'; }).join('') +
+              '</ul></div>' : '') +
+            (b.nottodo ? '<div class="info-section"><strong>O que não fazer:</strong><ul>' +
+              b.nottodo.map(function(t) { return '<li>' + esc(t) + '</li>'; }).join('') +
+              '</ul></div>' : '') +
+            '</div>';
+        }
+
+        html += '</div>';
       }
       html += '</div>';
     }
@@ -190,6 +247,25 @@
         html += '<label class="position-pill' + (psel ? ' selected' : '') + '">' +
           '<input type="checkbox" value="' + esc(p) + '" data-action="toggle-position" ' + (psel ? 'checked' : '') + '>' +
           '<span class="check-box"></span><span>' + esc(Ranges.posLabel(p)) + '</span>' +
+          '</label>';
+      }
+      html += '</div>';
+
+      html += '<p class="section-label">Modo de jogo</p><div class="option-list">';
+      var gameModes = ['open_range', 'vs_openraise', 'vs_3bet', 'vs_openshove'];
+      var gameModeLabels = {
+        'open_range': 'Open Range',
+        'vs_openraise': 'vs Open Raise',
+        'vs_3bet': 'vs 3-Bet',
+        'vs_openshove': 'vs Open Shove'
+      };
+      for (var k = 0; k < gameModes.length; k++) {
+        var mode = gameModes[k];
+        var msel = state.selectedGameMode === mode;
+        html += '<label class="option-row' + (msel ? ' selected' : '') + '">' +
+          '<input type="radio" name="gameMode" value="' + esc(mode) + '" data-action="select-game-mode" ' + (msel ? 'checked' : '') + '>' +
+          '<span class="radio-dot"></span>' +
+          '<span class="option-text"><div class="t1">' + esc(gameModeLabels[mode]) + '</div></span>' +
           '</label>';
       }
       html += '</div>';
@@ -211,29 +287,57 @@
   function renderGame() {
     var round = state.currentRound;
     var html = '<div class="screen">';
+    var errors = state.session.total - state.session.correct;
     html += '<div class="game-status">' +
       '<span class="tag">' + esc(round.blindNome) + '</span>' +
-      '<span class="score-badge">' + state.session.correct + '/' + state.session.total + (state.session.total ? ' · ' + pct(state.session.correct, state.session.total) + '%' : '') + '</span>' +
+      '<span class="score-badge">' +
+        '<span class="correct">' + state.session.correct + '</span>/' +
+        '<span class="total">' + state.session.total + '</span>' +
+        (state.session.total ? ' · <span class="percentage">' + pct(state.session.correct, state.session.total) + '%</span>' : '') +
+        (state.session.total ? ' · <span class="correct-count">✓ ' + state.session.correct + '</span> <span class="error-count">✗ ' + errors + '</span>' : '') +
+      '</span>' +
       '</div>';
+
+    var modoLabel = {
+      'open_range': 'Open Range',
+      'vs_openraise': 'vs Open Raise',
+      'vs_3bet': 'vs 3-Bet',
+      'vs_openshove': 'vs Open Shove'
+    }[state.selectedGameMode] || state.selectedGameMode;
+
+    var blindsMatch = round.blindNome.match(/(\d+bb)/i);
+    var blindsInfo = blindsMatch ? blindsMatch[1] : '';
 
     html += '<div class="game-center">';
     html += '<div class="ask-block">' +
-      Table.render(round.position) +
-      '<h2>Abre de ' + esc(Ranges.posLabel(round.position)) + '?</h2>' +
+      Table.render(round.position, blindsInfo) +
+      '<h2>' + modoLabel + ' - ' + esc(Ranges.posLabel(round.position)) + '</h2>' +
       '</div>';
+
+    if (blindsInfo) {
+      html += '<div class="blinds-effective">' + blindsInfo + ' efetivos</div>';
+    }
+
     html += '<div class="cards-row">' + UI.renderCard(round.c1) + UI.renderCard(round.c2) + '</div>';
 
     if (!state.lastResult) {
-      html += '<div class="answer-row">' +
-        '<button class="answer-btn abre" data-action="answer" data-answer="abre">✅ Abre</button>' +
-        '<button class="answer-btn nao" data-action="answer" data-answer="nao_abre">🚫 Não abre</button>' +
-        '</div>';
+      var buttons = '';
+      if (state.selectedGameMode === 'vs_openshove') {
+        buttons += '<button class="answer-btn call" data-action="answer" data-answer="call">Call</button>' +
+                   '<button class="answer-btn fold" data-action="answer" data-answer="fold">Fold</button>';
+      } else {
+        buttons += '<button class="answer-btn fold" data-action="answer" data-answer="fold">Fold</button>' +
+                   '<button class="answer-btn call" data-action="answer" data-answer="call">Call</button>' +
+                   '<button class="answer-btn raise" data-action="answer" data-answer="raise">Raise</button>' +
+                   '<button class="answer-btn allin" data-action="answer" data-answer="allin">All-in</button>';
+      }
+      html += '<div class="answer-row action-buttons">' + buttons + '</div>';
     } else {
       var r = state.lastResult;
-      var respostaTxt = r.correctAnswer === 'abre' ? 'Abre' : 'Não abre';
+      var actionLabel = { 'allin': 'All-in', 'raise': 'Raise', 'call': 'Call', 'fold': 'Fold' }[r.correctAnswer] || r.correctAnswer;
       html += '<div class="feedback-panel ' + (r.correct ? 'correct' : 'wrong') + '">' +
         '<div class="fb-title">' + (r.correct ? '✅ Correto!' : '❌ Errado') + '</div>' +
-        '<div class="fb-detail">Mão: <b>' + esc(r.handClass) + '</b> · Resposta certa: <b>' + respostaTxt + '</b></div>' +
+        '<div class="fb-detail">Mão: <b>' + esc(r.handClass) + '</b> · Ação correta: <b>' + actionLabel + '</b></div>' +
         '</div>';
       html += '<button class="btn-primary" style="margin-top:0" data-action="next-hand">Próxima mão →</button>';
     }
@@ -346,8 +450,20 @@
 
   /* ================= Eventos ================= */
   document.getElementById('app').addEventListener('click', function (e) {
+    var infoBtn = e.target.closest('.info-btn');
+    if (infoBtn) {
+      e.stopPropagation();
+      e.preventDefault();
+      var blindId = infoBtn.getAttribute('data-blind-id');
+      state.expandedBlindId = state.expandedBlindId === blindId ? null : blindId;
+      render();
+      return;
+    }
+
     var el = e.target.closest('[data-action]');
-    if (!el) return;
+    if (!el) {
+      return;
+    }
     var action = el.getAttribute('data-action');
 
     if (action === 'go-config') { state.screen = 'config'; render(); }
@@ -413,6 +529,10 @@
       var pos = el.value;
       var idx = state.selectedPositions.indexOf(pos);
       if (idx === -1) state.selectedPositions.push(pos); else state.selectedPositions.splice(idx, 1);
+      render();
+    }
+    else if (action === 'select-game-mode') {
+      state.selectedGameMode = el.value;
       render();
     }
     else if (el.id === 'file-input') {

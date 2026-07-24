@@ -22,13 +22,174 @@
 }
 .score-badge {
   font-family: var(--font-mono); font-size: 13px; color: var(--accent); font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.score-badge .correct {
+  color: #27AE60;
+  font-weight: 700;
+}
+
+.score-badge .total {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.score-badge .percentage {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.score-badge .correct-count {
+  color: #27AE60;
+  font-weight: 700;
+}
+
+.score-badge .error-count {
+  color: #D97A6C;
+  font-weight: 700;
 }
 
 .answer-row { display: flex; gap: 10px; width: 100%; }
+.answer-row.action-buttons { flex-wrap: wrap; }
 .answer-btn {
-  flex: 1; padding: 16px 8px; border-radius: 14px; border: 1.5px solid var(--border-soft);
+  flex: 1; min-width: 100px; padding: 16px 8px; border-radius: 14px; border: 1.5px solid var(--border-soft);
   background: var(--surface); color: var(--text); font-size: 15px; font-weight: 700;
 }
 .answer-btn:active { transform: scale(0.97); }
+
+/* Cores para ações de poker */
+.answer-btn.allin {
+  background: #E74C3C;
+  border-color: #C0392B;
+  color: white;
+}
+.answer-btn.raise {
+  background: #F39C12;
+  border-color: #D68910;
+  color: white;
+}
+.answer-btn.call {
+  background: #27AE60;
+  border-color: #1E8449;
+  color: white;
+}
+.answer-btn.fold {
+  background: #95A5A6;
+  border-color: #7F8C8D;
+  color: white;
+}
+
+/* Compatibilidade com estilo antigo */
 .answer-btn.abre { border-color: var(--success); color: var(--success); }
 .answer-btn.nao { border-color: var(--danger); color: var(--danger); }
+
+.blinds-effective {
+  text-align: center;
+  font-size: 12px;
+  font-weight: 600;
+  color: white;
+  margin-bottom: 12px;
+  font-family: var(--font-mono);
+  text-transform: capitalize;
+  letter-spacing: 0.05em;
+}
+
+.blind-option-wrapper {
+  margin-bottom: 8px;
+}
+
+.blind-option-wrapper .option-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.info-btn {
+  position: absolute;
+  right: 14px;
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--accent);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+  padding: 0;
+  margin: 0;
+}
+
+.info-btn:hover {
+  background: var(--accent);
+  color: #1A1508;
+}
+
+.info-btn:active {
+  transform: scale(0.9);
+}
+
+.blind-info-panel {
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  padding: 14px;
+  margin-bottom: 12px;
+  animation: slideDown 0.2s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.info-section {
+  margin-bottom: 12px;
+}
+
+.info-section:last-child {
+  margin-bottom: 0;
+}
+
+.info-section strong {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.info-section p {
+  font-size: 12px;
+  color: var(--text);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.info-section ul {
+  font-size: 12px;
+  color: var(--text);
+  line-height: 1.5;
+  margin: 0;
+  padding-left: 16px;
+}
+
+.info-section li {
+  margin-bottom: 4px;
+}
