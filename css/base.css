@@ -220,3 +220,4 @@ details.detail-block summary {
 .toast { margin-top: 14px; padding: 12px 14px; border-radius: 10px; font-size: 13px; }
 .toast.success { background: var(--success-bg); color: var(--success); border: 1px solid var(--success); }
 .toast.error { background: var(--danger-bg); color: var(--danger); border: 1px solid var(--danger); }
+.toast.warning { background: rgba(216, 180, 117, 0.14); color: var(--accent); border: 1px solid var(--accent); }

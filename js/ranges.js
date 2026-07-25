@@ -66,6 +66,66 @@ RT.ranges = (function () {
     return blind.posicoes[position].indexOf(handClass) !== -1;
   }
 
+  /* ---------- Validação: mãos duplicadas entre ranges ---------- */
+  var RANGE_FIELDS = ['fold_range', 'call_range', 'raise_range', 'allin_range', 'range'];
+  var GAME_MODE_LABELS = {
+    open_range: 'Open Raise', vs_openraise_range: 'vs Open Raise',
+    vs_3bet_range: 'vs 3-Bet', vs_openshove_range: 'vs Open Shove'
+  };
+  function gameModeLabel(key) { return GAME_MODE_LABELS[key] || key; }
+
+  /* Dentro de um mesmo blind + posição + modo de jogo, cada mão só deveria
+     aparecer em UM dos ranges de ação (fold/call/raise/allin/...). Se
+     aparecer em mais de um, a resposta correta fica ambígua — o usuário
+     precisa ser avisado pra corrigir o JSON importado. */
+  function findDuplicateHands(rangesData) {
+    var duplicates = [];
+    var blinds = (rangesData && rangesData.blinds) || [];
+    for (var b = 0; b < blinds.length; b++) {
+      var blind = blinds[b];
+      var posicoes = blind.posicoes || {};
+      var posKeys = Object.keys(posicoes);
+      for (var p = 0; p < posKeys.length; p++) {
+        var posKey = posKeys[p];
+        var posEntry = posicoes[posKey];
+        if (!posEntry || typeof posEntry !== 'object') continue;
+        var gameModeKeys = Object.keys(posEntry);
+        for (var g = 0; g < gameModeKeys.length; g++) {
+          var gameModeKey = gameModeKeys[g];
+          var posData = posEntry[gameModeKey];
+          if (!posData || typeof posData !== 'object') continue;
+
+          var handFields = {};
+          for (var f = 0; f < RANGE_FIELDS.length; f++) {
+            var field = RANGE_FIELDS[f];
+            var arr = posData[field];
+            if (!Array.isArray(arr)) continue;
+            for (var h = 0; h < arr.length; h++) {
+              var hand = arr[h];
+              handFields[hand] = handFields[hand] || [];
+              if (handFields[hand].indexOf(field) === -1) handFields[hand].push(field);
+            }
+          }
+
+          var hands = Object.keys(handFields);
+          for (var i = 0; i < hands.length; i++) {
+            if (handFields[hands[i]].length > 1) {
+              duplicates.push({
+                blindId: blind.id,
+                blindNome: blind.nome,
+                position: posKey,
+                gameMode: gameModeKey,
+                handClass: hands[i],
+                fields: handFields[hands[i]]
+              });
+            }
+          }
+        }
+      }
+    }
+    return duplicates;
+  }
+
   return {
     STORAGE_KEY: STORAGE_KEY,
     posLabel: posLabel,
@@ -78,6 +138,8 @@ RT.ranges = (function () {
     saveCustomRanges: saveCustomRanges,
     resetToDefault: resetToDefault,
     findBlind: findBlind,
-    isInRange: isInRange
+    isInRange: isInRange,
+    gameModeLabel: gameModeLabel,
+    findDuplicateHands: findDuplicateHands
   };
 })();

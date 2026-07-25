@@ -52,6 +52,20 @@
   font-weight: 700;
 }
 
+.score-badge .streak-badge {
+  color: #F39C12;
+  font-weight: 700;
+}
+
+.score-badge .best-streak-badge {
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.speed-toggle-row {
+  margin-top: 8px;
+}
+
 .answer-row { display: flex; gap: 10px; width: 100%; }
 .answer-row.action-buttons { flex-wrap: wrap; }
 .answer-btn {
