@@ -28,6 +28,92 @@
     return isNaN(n) ? 0 : n;
   }
 
+  /* ---------- Memória de erros (repetição espaçada) ----------
+     Toda mão errada (modo rápido ou lento) fica numa fila e volta a
+     aparecer, com as mesmas cartas/posição/blind, alguns rounds depois —
+     tudo em localStorage, sem precisar de login. Escada de 3 estágios:
+       errou (qualquer estágio)      -> estágio 1, reaparece em 4-6 rounds
+       acertou no estágio 1          -> estágio 2, reaparece em 12-18 rounds
+       acertou no estágio 2          -> estágio 3, reaparece em 36 rounds (última vez)
+       acertou no estágio 3          -> dominado, sai da fila
+       acertou um round normal (não vindo da fila) -> não guarda nada */
+  var RETRY_QUEUE_KEY = "rt_openraise_retry_v1";
+  var ROUND_COUNTER_KEY = "rt_openraise_roundcount_v1";
+  var RETRY_STAGE_ROUNDS = { 1: [4, 6], 2: [12, 18], 3: [36, 36] };
+
+  function loadRetryQueue() {
+    var raw = Storage.get(RETRY_QUEUE_KEY);
+    if (!raw) return [];
+    try {
+      var arr = JSON.parse(raw);
+      return Array.isArray(arr) ? arr : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
+  function saveRetryQueue(queue) {
+    Storage.set(RETRY_QUEUE_KEY, JSON.stringify(queue));
+  }
+
+  function loadRoundCounter() {
+    var n = parseInt(Storage.get(ROUND_COUNTER_KEY), 10);
+    return isNaN(n) ? 0 : n;
+  }
+
+  function saveRoundCounter(n) {
+    Storage.set(ROUND_COUNTER_KEY, String(n));
+  }
+
+  function randBetween(min, max) {
+    return min + Math.floor(Math.random() * (max - min + 1));
+  }
+
+  /* Remove e devolve a entrada mais atrasada da fila que já está no prazo
+     (dueAtRound <= rounds jogados até agora). Uma por mão sorteada. */
+  function pickDueRetryEntry() {
+    var queue = state.retryQueue;
+    var dueIdx = -1;
+    for (var i = 0; i < queue.length; i++) {
+      if (queue[i].dueAtRound <= state.roundsPlayed) {
+        if (dueIdx === -1 || queue[i].dueAtRound < queue[dueIdx].dueAtRound)
+          dueIdx = i;
+      }
+    }
+    if (dueIdx === -1) return null;
+    var entry = queue.splice(dueIdx, 1)[0];
+    saveRetryQueue(queue);
+    return entry;
+  }
+
+  function pushRetryEntry(round, stage) {
+    var range = RETRY_STAGE_ROUNDS[stage];
+    var entry = {
+      blindId: round.blindId,
+      position: round.position,
+      c1: round.c1,
+      c2: round.c2,
+      handClass: round.handClass,
+      stage: stage,
+      dueAtRound: state.roundsPlayed + randBetween(range[0], range[1]),
+    };
+    state.retryQueue.push(entry);
+    saveRetryQueue(state.retryQueue);
+  }
+
+  /* Decide o que fazer com a fila de repetição após a resposta do usuário.
+     round.retryStage é 0 pra mão sorteada normalmente, ou 1/2/3 se ela veio
+     da fila de repetição. */
+  function resolveRetryOutcome(round, correct) {
+    if (!correct) {
+      pushRetryEntry(round, 1);
+      return;
+    }
+    if (round.retryStage === 1) pushRetryEntry(round, 2);
+    else if (round.retryStage === 2) pushRetryEntry(round, 3);
+    /* estágio 3 acertado, ou acerto de mão normal (retryStage 0): nada a guardar */
+  }
+
   function unionPositions(blinds) {
     var seen = {},
       out = [];
@@ -65,6 +151,11 @@
     bestStreak: loadBestStreak(),
     currentRound: null,
     lastResult: null,
+    previousRound: null,
+    showPrevHand: false,
+    showRangeGrid: false,
+    retryQueue: loadRetryQueue(),
+    roundsPlayed: loadRoundCounter(),
     history: loadHistory(),
     importMessage: null,
   };
@@ -103,39 +194,123 @@
     return "fold";
   }
 
-  function dealNewHand() {
-    var blinds = selectedBlinds();
-    var candidates = [];
-    for (var i = 0; i < blinds.length; i++) {
-      for (var j = 0; j < state.selectedPositions.length; j++) {
-        var pos = state.selectedPositions[j];
-        if (blinds[i].posicoes[pos])
-          candidates.push({
-            blindId: blinds[i].id,
-            blindNome: blinds[i].nome,
-            position: pos,
-          });
+  var GRID_ORDER = Cards.RANKS.slice().reverse(); // A,K,Q,...,2
+
+  function classifyHandForGrid(posData, handClass) {
+    if (!posData) return null;
+    if (posData.fold_range && posData.fold_range.indexOf(handClass) !== -1)
+      return "fold";
+    if (posData.allin_range && posData.allin_range.indexOf(handClass) !== -1)
+      return "allin";
+    if (posData.raise_range && posData.raise_range.indexOf(handClass) !== -1)
+      return "raise";
+    if (posData.call_range && posData.call_range.indexOf(handClass) !== -1)
+      return "call";
+    if (posData.range && posData.range.indexOf(handClass) !== -1) return "raise";
+    return null;
+  }
+
+  function renderRangeGrid(rangesData, round) {
+    var blind = Ranges.findBlind(rangesData, round.blindId);
+    var posData =
+      blind && blind.posicoes[round.position]
+        ? blind.posicoes[round.position].open_range
+        : null;
+
+    var html = '<div class="range-grid-wrap">';
+    html +=
+      '<div class="range-grid-legend">' +
+      '<span><i class="legend-swatch cell-fold"></i>Fold</span>' +
+      '<span><i class="legend-swatch cell-raise"></i>Raise</span>' +
+      '<span><i class="legend-swatch cell-call"></i>Call</span>' +
+      '<span><i class="legend-swatch cell-allin"></i>All-in</span>' +
+      '<span><i class="legend-swatch cell-empty"></i>Não encontrado</span>' +
+      "</div>";
+    html += '<div class="range-grid">';
+    for (var r = 0; r < GRID_ORDER.length; r++) {
+      for (var c = 0; c < GRID_ORDER.length; c++) {
+        var handClass;
+        if (r === c) {
+          handClass = GRID_ORDER[r] + GRID_ORDER[r];
+        } else if (r < c) {
+          handClass = GRID_ORDER[r] + GRID_ORDER[c] + "s";
+        } else {
+          handClass = GRID_ORDER[c] + GRID_ORDER[r] + "o";
+        }
+        var category = classifyHandForGrid(posData, handClass);
+        var isCurrent = handClass === round.handClass;
+        html +=
+          '<div class="range-cell ' +
+          (category ? "cell-" + category : "cell-empty") +
+          (isCurrent ? " current-hand" : "") +
+          '">' +
+          esc(handClass) +
+          "</div>";
       }
     }
-    var choice = candidates[Math.floor(Math.random() * candidates.length)];
-    var pair = Cards.dealTwoCards();
-    var handClass = Cards.getHandClass(pair[0], pair[1]);
+    html += "</div></div>";
+    return html;
+  }
+
+  function dealNewHand() {
+    state.roundsPlayed++;
+    saveRoundCounter(state.roundsPlayed);
+    var retryEntry = pickDueRetryEntry();
+    var retryBlind = retryEntry
+      ? Ranges.findBlind(state.rangesData, retryEntry.blindId)
+      : null;
+
+    var blindId, blindNome, position, c1, c2, handClass;
+    if (retryEntry && retryBlind && retryBlind.posicoes[retryEntry.position]) {
+      blindId = retryBlind.id;
+      blindNome = retryBlind.nome;
+      position = retryEntry.position;
+      c1 = retryEntry.c1;
+      c2 = retryEntry.c2;
+      handClass = retryEntry.handClass;
+    } else {
+      retryEntry = null;
+      var blinds = selectedBlinds();
+      var candidates = [];
+      for (var i = 0; i < blinds.length; i++) {
+        for (var j = 0; j < state.selectedPositions.length; j++) {
+          var pos = state.selectedPositions[j];
+          if (blinds[i].posicoes[pos])
+            candidates.push({
+              blindId: blinds[i].id,
+              blindNome: blinds[i].nome,
+              position: pos,
+            });
+        }
+      }
+      var choice = candidates[Math.floor(Math.random() * candidates.length)];
+      var pair = Cards.dealTwoCards();
+      blindId = choice.blindId;
+      blindNome = choice.blindNome;
+      position = choice.position;
+      c1 = pair[0];
+      c2 = pair[1];
+      handClass = Cards.getHandClass(c1, c2);
+    }
+
     var correctAnswer = getCorrectAction(
       state.rangesData,
-      choice.blindId,
-      choice.position,
+      blindId,
+      position,
       handClass,
     );
     state.currentRound = {
-      blindId: choice.blindId,
-      blindNome: choice.blindNome,
-      position: choice.position,
-      c1: pair[0],
-      c2: pair[1],
+      blindId: blindId,
+      blindNome: blindNome,
+      position: position,
+      c1: c1,
+      c2: c2,
       handClass: handClass,
       correctAnswer: correctAnswer,
+      retryStage: retryEntry ? retryEntry.stage : 0,
     };
     state.lastResult = null;
+    state.showRangeGrid = false;
   }
 
   function handleAnswer(userAnswer) {
@@ -154,6 +329,7 @@
       correctAnswer: round.correctAnswer,
       correct: correct,
     });
+    resolveRetryOutcome(round, correct);
 
     if (state.speedMode) {
       state.streak = correct ? state.streak + 1 : 0;
@@ -161,6 +337,17 @@
         state.bestStreak = state.streak;
         Storage.set(BEST_STREAK_KEY, String(state.bestStreak));
       }
+      state.previousRound = {
+        blindNome: round.blindNome,
+        position: round.position,
+        c1: round.c1,
+        c2: round.c2,
+        handClass: round.handClass,
+        correctAnswer: round.correctAnswer,
+        userAnswer: userAnswer,
+        correct: correct,
+      };
+      state.showPrevHand = false;
       dealNewHand();
       render();
       return;
@@ -302,7 +489,17 @@
     if (state.selectedTipo) {
       var blinds = Ranges.blindsByTipo(state.rangesData, state.selectedTipo);
       html +=
-        '<p class="section-label">Níveis de blind <span style="text-transform:none;letter-spacing:0">(marque mais de um para misturar)</span></p><div class="option-list">';
+        '<p class="section-label">Níveis de blind <span style="text-transform:none;letter-spacing:0">(marque mais de um para misturar)</span></p>';
+      html +=
+        '<div class="select-toggle-row"><button class="link-btn" data-action="toggle-all-blinds">' +
+        (blinds.length > 0 &&
+        blinds.every(function (b) {
+          return state.selectedBlindIds.indexOf(b.id) !== -1;
+        })
+          ? "Limpar seleção"
+          : "Selecionar todos (8 a 100bb)") +
+        "</button></div>";
+      html += '<div class="option-list">';
       for (var i = 0; i < blinds.length; i++) {
         var b = blinds[i];
         var sel = state.selectedBlindIds.indexOf(b.id) !== -1;
@@ -461,6 +658,11 @@
           "</span>"
         : "") +
       "</span>" +
+      (state.speedMode
+        ? '<button class="back-hand-btn" data-action="show-prev-hand" ' +
+          (state.previousRound ? "" : "disabled") +
+          ">↩ Última mão</button>"
+        : "") +
       "</div>";
 
     var blindsMatch = round.blindNome.match(/(\d+bb)/i);
@@ -484,6 +686,16 @@
       UI.renderCard(round.c1) +
       UI.renderCard(round.c2) +
       "</div>";
+
+    html +=
+      '<button class="range-grid-toggle-btn" data-action="toggle-range-grid">' +
+      (state.showRangeGrid ? "🙈 Esconder tabela de range" : "📊 Ver tabela de range") +
+      "</button>";
+
+    var autoShowGrid = !!(state.lastResult && !state.lastResult.correct);
+    if (state.showRangeGrid && !autoShowGrid) {
+      html += renderRangeGrid(state.rangesData, round);
+    }
 
     if (!state.lastResult) {
       html +=
@@ -512,6 +724,9 @@
         actionLabel +
         "</b></div>" +
         "</div>";
+      if (!r.correct) {
+        html += renderRangeGrid(state.rangesData, round);
+      }
       html +=
         '<button class="btn-primary" style="margin-top:0" data-action="next-hand">Próxima mão →</button>';
     }
@@ -519,8 +734,51 @@
 
     html +=
       '<div class="end-session-link"><button data-action="end-session">Encerrar sessão</button></div>';
+
+    if (state.speedMode && state.showPrevHand && state.previousRound) {
+      html += renderPrevHandModal(state.previousRound);
+    }
+
     html += "</div>";
     return html;
+  }
+
+  function renderPrevHandModal(prev) {
+    var actionLabel =
+      { allin: "All-in", raise: "Raise", call: "Call", fold: "Fold" }[
+        prev.correctAnswer
+      ] || prev.correctAnswer;
+    var userLabel =
+      { allin: "All-in", raise: "Raise", call: "Call", fold: "Fold" }[
+        prev.userAnswer
+      ] || prev.userAnswer;
+    return (
+      '<div class="modal-overlay">' +
+      '<div class="modal-card">' +
+      '<div class="modal-title">Última mão</div>' +
+      '<div class="tag" style="margin-bottom:10px;display:inline-block">' +
+      esc(prev.blindNome) +
+      " · " +
+      esc(Ranges.posLabel(prev.position)) +
+      "</div>" +
+      '<div class="cards-row">' +
+      UI.renderCard(prev.c1) +
+      UI.renderCard(prev.c2) +
+      "</div>" +
+      '<div class="fb-detail" style="margin-top:12px">Mão: <b>' +
+      esc(prev.handClass) +
+      "</b> · Ação correta: <b>" +
+      actionLabel +
+      "</b></div>" +
+      '<div class="fb-detail">Sua resposta: <b>' +
+      userLabel +
+      "</b> " +
+      (prev.correct ? "✅" : "❌") +
+      "</div>" +
+      '<button class="btn-primary" style="margin-top:14px" data-action="close-prev-hand">Fechar</button>' +
+      "</div>" +
+      "</div>"
+    );
   }
 
   /* ---------- Stats ---------- */
@@ -719,6 +977,20 @@
       state.screen = "import";
       state.importMessage = null;
       render();
+    } else if (action === "toggle-all-blinds") {
+      var allBlinds = Ranges.blindsByTipo(state.rangesData, state.selectedTipo);
+      var allSelected =
+        allBlinds.length > 0 &&
+        allBlinds.every(function (b) {
+          return state.selectedBlindIds.indexOf(b.id) !== -1;
+        });
+      state.selectedBlindIds = allSelected
+        ? []
+        : allBlinds.map(function (b) {
+            return b.id;
+          });
+      state.selectedPositions = unionPositions(selectedBlinds());
+      render();
     } else if (action === "toggle-all-positions") {
       var positions = unionPositions(selectedBlinds());
       state.selectedPositions =
@@ -730,6 +1002,8 @@
       if (el.hasAttribute("disabled")) return;
       state.session = { total: 0, correct: 0 };
       state.streak = 0;
+      state.previousRound = null;
+      state.showPrevHand = false;
       dealNewHand();
       state.screen = "game";
       render();
@@ -737,6 +1011,16 @@
       handleAnswer(el.getAttribute("data-answer"));
     } else if (action === "next-hand") {
       dealNewHand();
+      render();
+    } else if (action === "toggle-range-grid") {
+      state.showRangeGrid = !state.showRangeGrid;
+      render();
+    } else if (action === "show-prev-hand") {
+      if (el.hasAttribute("disabled")) return;
+      state.showPrevHand = true;
+      render();
+    } else if (action === "close-prev-hand") {
+      state.showPrevHand = false;
       render();
     } else if (action === "end-session") {
       state.screen = "config";

@@ -10,6 +10,81 @@
   var GAME_MODE_STORAGE_KEY = 'rt_showdown_gamemode_v1';
   var REVEAL_DELAY_MS = 3000;
 
+  /* ---------- Memória de erros (repetição espaçada) ----------
+     Toda mão errada fica numa fila (por modo) e volta a aparecer, com o
+     mesmo board/mãos, alguns rounds depois — sem precisar de login, tudo
+     em localStorage por modo. Escada de 3 estágios:
+       errou (qualquer estágio)      -> estágio 1, reaparece em 4-6 rounds
+       acertou no estágio 1          -> estágio 2, reaparece em 12-18 rounds
+       acertou no estágio 2          -> estágio 3, reaparece em 36 rounds (última vez)
+       acertou no estágio 3          -> dominado, sai da fila
+       acertou um round normal (não vindo da fila) -> não guarda nada */
+  var RETRY_STAGE_ROUNDS = { 1: [4, 6], 2: [12, 18], 3: [36, 36] };
+
+  function retryQueueKey(mode) { return mode === 'hand' ? 'rt_showdown_retry_hand_v1' : 'rt_showdown_retry_winner_v1'; }
+  function roundCounterKey(mode) { return mode === 'hand' ? 'rt_showdown_roundcount_hand_v1' : 'rt_showdown_roundcount_winner_v1'; }
+
+  function loadRetryQueue(mode) {
+    var raw = Storage.get(retryQueueKey(mode));
+    if (!raw) return [];
+    try { var arr = JSON.parse(raw); return Array.isArray(arr) ? arr : []; } catch (e) { return []; }
+  }
+
+  function saveRetryQueue(mode, queue) {
+    Storage.set(retryQueueKey(mode), JSON.stringify(queue));
+  }
+
+  function loadRoundCounter(mode) {
+    var n = parseInt(Storage.get(roundCounterKey(mode)), 10);
+    return isNaN(n) ? 0 : n;
+  }
+
+  function saveRoundCounter(mode, n) {
+    Storage.set(roundCounterKey(mode), String(n));
+  }
+
+  /* Remove e devolve a entrada mais atrasada da fila que já está no prazo
+     (dueAtRound <= rounds jogados até agora). Uma por mão sorteada. */
+  function pickDueRetryEntry() {
+    var queue = state.retryQueue;
+    var dueIdx = -1;
+    for (var i = 0; i < queue.length; i++) {
+      if (queue[i].dueAtRound <= state.roundsPlayed) {
+        if (dueIdx === -1 || queue[i].dueAtRound < queue[dueIdx].dueAtRound) dueIdx = i;
+      }
+    }
+    if (dueIdx === -1) return null;
+    var entry = queue.splice(dueIdx, 1)[0];
+    saveRetryQueue(state.gameMode, queue);
+    return entry;
+  }
+
+  function pushRetryEntry(round, stage) {
+    var range = RETRY_STAGE_ROUNDS[stage];
+    var entry = {
+      numPlayers: round.numPlayers,
+      hands: round.hands,
+      board: round.board,
+      stage: stage,
+      dueAtRound: state.roundsPlayed + randBetween(range[0], range[1])
+    };
+    state.retryQueue.push(entry);
+    saveRetryQueue(state.gameMode, state.retryQueue);
+  }
+
+  /* Decide o que fazer com a fila de repetição após a resposta do usuário.
+     round.retryStage é 0 pra mão sorteada normalmente, ou 1/2/3 se ela veio
+     da fila de repetição. */
+  function resolveRetryOutcome(round, correct) {
+    if (!correct) {
+      pushRetryEntry(round, 1);
+      return;
+    }
+    if (round.retryStage === 1) pushRetryEntry(round, 2);
+    else if (round.retryStage === 2) pushRetryEntry(round, 3);
+    /* estágio 3 acertado, ou acerto de mão normal (retryStage 0): nada a guardar */
+  }
+
   var Storage = RT.storage;
   var Cards = RT.cards;
   var Eval = RT.handEval;
@@ -46,7 +121,9 @@
     gameMode: gameMode,
     session: { total: 0, correct: 0 },
     round: null,
-    history: loadHistory(gameMode)
+    history: loadHistory(gameMode),
+    retryQueue: loadRetryQueue(gameMode),
+    roundsPlayed: loadRoundCounter(gameMode)
   };
 
   function recordAttempt(record) {
@@ -63,11 +140,22 @@
     roundId++;
     var thisRound = roundId;
 
-    var numPlayers = randBetween(Math.min(2, state.maxPlayers), state.maxPlayers);
-    var deck = Cards.newShuffledDeck();
-    var hands = [];
-    for (var p = 0; p < numPlayers; p++) hands.push([deck.pop(), deck.pop()]);
-    var board = [deck.pop(), deck.pop(), deck.pop(), deck.pop(), deck.pop()];
+    state.roundsPlayed++;
+    saveRoundCounter(state.gameMode, state.roundsPlayed);
+    var retryEntry = pickDueRetryEntry();
+
+    var numPlayers, hands, board;
+    if (retryEntry) {
+      numPlayers = retryEntry.numPlayers;
+      hands = retryEntry.hands;
+      board = retryEntry.board;
+    } else {
+      numPlayers = randBetween(Math.min(2, state.maxPlayers), state.maxPlayers);
+      var deck = Cards.newShuffledDeck();
+      hands = [];
+      for (var p = 0; p < numPlayers; p++) hands.push([deck.pop(), deck.pop()]);
+      board = [deck.pop(), deck.pop(), deck.pop(), deck.pop(), deck.pop()];
+    }
 
     var scores = hands.map(function (h) { return Eval.evaluateBest7(h.concat(board)); });
     var best = scores[0];
@@ -86,7 +174,8 @@
       revealAt: null,
       picked: null,
       selectedCards: [],
-      elapsedMs: null
+      elapsedMs: null,
+      retryStage: retryEntry ? retryEntry.stage : 0
     };
     render();
 

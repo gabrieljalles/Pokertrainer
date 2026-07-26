@@ -207,3 +207,113 @@
 .info-section li {
   margin-bottom: 4px;
 }
+
+/* Botão "Última mão" (modo rápido) */
+.back-hand-btn {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+  border-radius: 20px;
+  padding: 5px 10px;
+  white-space: nowrap;
+}
+.back-hand-btn:disabled { opacity: 0.4; }
+.back-hand-btn:active:not(:disabled) { transform: scale(0.96); }
+
+/* Botão "Ver tabela de range" (estudo, disponível a qualquer momento) */
+.range-grid-toggle-btn {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  background: transparent;
+  border: 1px solid var(--border-soft);
+  border-radius: 20px;
+  padding: 5px 12px;
+  margin: 2px 0 -6px;
+}
+.range-grid-toggle-btn:active { transform: scale(0.96); }
+
+/* Modal de revisão da última mão */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  padding: 20px;
+}
+.modal-card {
+  background: var(--surface);
+  border: 1px solid var(--border-soft);
+  border-radius: 16px;
+  padding: 20px;
+  max-width: 360px;
+  width: 100%;
+  text-align: center;
+}
+.modal-card .cards-row {
+  justify-content: center;
+}
+.modal-title {
+  font-size: 15px;
+  font-weight: 700;
+  margin-bottom: 10px;
+}
+
+/* Tabela 13x13 de ranges (exibida ao errar no modo lento) */
+.range-grid-wrap { margin-top: 14px; }
+.range-grid-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+.range-grid-legend span { display: flex; align-items: center; gap: 4px; }
+.legend-swatch {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+}
+.range-grid {
+  display: grid;
+  grid-template-columns: repeat(13, 1fr);
+  gap: 2px;
+  background: var(--border-soft);
+  border: 1px solid var(--border-soft);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.range-cell {
+  aspect-ratio: 1 / 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  font-weight: 700;
+  color: #1a1508;
+}
+.range-cell.current-hand {
+  outline: 2px solid #F1C40F;
+  outline-offset: -2px;
+  box-shadow: inset 0 0 0 1px #F1C40F;
+}
+.range-cell.cell-empty { background: #95A5A6; color: #2C3E50; }
+.range-cell.cell-fold { background: #AED6F1; }
+.range-cell.cell-raise { background: #F5B7B1; }
+.range-cell.cell-call { background: #27AE60; color: white; }
+.range-cell.cell-allin { background: #922B21; color: white; }
+.legend-swatch.cell-empty { background: #95A5A6; }
+.legend-swatch.cell-fold { background: #AED6F1; }
+.legend-swatch.cell-raise { background: #F5B7B1; }
+.legend-swatch.cell-call { background: #27AE60; }
+.legend-swatch.cell-allin { background: #922B21; }
