@@ -1,4 +1,4 @@
-/* Minigame "Open Raise": app SPA (home/config/game/stats/import).
+/* Minigame "RFI": app SPA (home/config/game/stats/import).
    Depende de RT.storage, RT.cards, RT.ranges, RT.ui e window.RT_DEFAULT_RANGES
    já carregados antes deste arquivo. */
 (function () {
@@ -472,7 +472,7 @@
       '<div class="minigame-list">' +
       '<button class="minigame-card" data-action="go-config">' +
       '<div class="chip">OR</div>' +
-      '<div class="minigame-info"><h3>Open Raise</h3><p>Duas cartas na mão: qual é a ação correta? All-in, Raise, Call ou Fold?</p></div>' +
+      '<div class="minigame-info"><h3>RFI</h3><p>Duas cartas na mão: qual é a ação correta? All-in, Raise, Call ou Fold?</p></div>' +
       '<span class="arrow">→</span>' +
       "</button>" +
       '<a class="minigame-card" href="treino_showdown.html">' +
@@ -824,7 +824,7 @@
     html +=
       '<div class="hero">' +
       '<p class="eyebrow">Histórico de Treino</p>' +
-      "<h1>Open Raise</h1>" +
+      "<h1>RFI</h1>" +
       "</div>";
 
     if (state.history.length === 0) {

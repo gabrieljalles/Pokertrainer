@@ -3,7 +3,7 @@ window.RT_DEFAULT_RANGES = {
   blinds: [
     {
       id: "9max (8bb-) torneio",
-      nome: "9max (8bb-) torneio",
+      nome: "8bb-",
       descricao: "Stack menor ou igual a 8bb- ranges de ALL INN.",
       why: "Com menos de 8bb, o stack é curto demais pra jogar pós-flop de verdade — qualquer aposta relevante já te compromete quase todo o stack. Por isso o movimento padrão é push/fold, sem call. A exceção é o SB: como ele já tem 0,5bb postado, completar pra ver o flop custa só mais 0,5bb — um preço tão baixo que quase qualquer mão com alguma equity vira +EV pra essa ação. Não é 'jogar pós-flop de verdade', é pagar um preço mínimo pra ter a chance de ver um flop barato, sem comprometer o stack como um shove faria.",
       todo: [
@@ -1205,7 +1205,7 @@ window.RT_DEFAULT_RANGES = {
     },
     {
       id: "9max (9 a 12bb) torneio",
-      nome: "9max (9 a 12bb) torneio",
+      nome: "12 a 9bb",
       descricao: "Range de All in com aparição de mini-raise",
       why: "Range muito caracterizado por Mini-raise.O risco recompensa de ir all-in com 12bb traz uma relação especulativa muito pequena. Menor que dar Shove de 8bb. Se tomar um call e perder, você é eliminado do torneio com um stack que ainda tinha alguma margem de manobra.",
       todo: [
@@ -2409,7 +2409,7 @@ window.RT_DEFAULT_RANGES = {
     },
     {
       id: "9max (13 a 17bb) torneio",
-      nome: "9max (13 a 17bb) torneio",
+      nome: "17 a 13bb",
       descricao:
         "Predominantemente um open-raise, apenas alguns ALL-ins de posições tardias.",
       why: "13-17bb é a faixa de transição entre push/fold puro e jogo de raise. O stack já é grande o bastante pra um raise normal não te deixar pot-committed sozinho — por isso ele vira a ação padrão nas posições iniciais, onde tem muita gente pra agir depois e o all-in não compensa o risco. Só em HJ/CO/BTN, com menos jogadores pra reagir, o shove volta a aparecer, misturado com o raise: ali ele funciona como uma ferramenta de fold equity pura pra mãos que não valem um raise-fold mas valem uma pressão direta. A SB segue sua lógica própria, de preço baixo — o call ali é limpar pra ver o flop contra o BB, não pagar um raise.",
@@ -3608,7 +3608,7 @@ window.RT_DEFAULT_RANGES = {
     },
     {
       id: "9max (18 a 25bb) torneio",
-      nome: "9max (18 a 25bb) torneio",
+      nome: "25 a 18bb",
       descricao:
         "Open-raise puro em todas as posições, all-in praticamente só na SB",
       why: "Com 18-25bb o all-in de mesa cheia desaparece quase por completo (UTG a BTN é 100% raise). O motivo é o oposto do que acontece em 13-17bb: aqui o stack já é grande o bastante pra sustentar um raise-fold de verdade sem risco de ficar pot-committed contra um 3-bet, e o m-ratio ainda não caiu a ponto de precisar forçar all-in pra ter fold equity — o raise normal já rouba o suficiente sozinho. A SB continua sendo o caso à parte: o call ali é completar o small blind pra ver o flop contra o BB por um preço baixo, não pagar uma aposta, e o pouco all-in que sobra (6 mãos) é reservado pra pressionar o range de defesa largo do BB, não pra buscar fold equity de mesa toda.",
@@ -4800,7 +4800,7 @@ window.RT_DEFAULT_RANGES = {
     },
     {
       id: "9max (26 a 35bb) torneio",
-      nome: "9max (26 a 35bb) torneio",
+      nome: "35 a 26bb",
       descricao: "Open-raise puro em todas as posições, all-in some até da SB",
       why: "Em 18-25bb ainda sobrava um resquício de all-in na SB (6 mãos) pra pressionar a defesa larga do BB. Aqui esse resquício desaparece — SB fica com allin_range zerado, igual às outras posições. O stack já é fundo o bastante pra qualquer decisão pré-flop virar puro raise/call/fold, sem precisar forçar a mão binária do all-in em lugar nenhum da mesa. Ao mesmo tempo os ranges de raise continuam abrindo nas posições tardias (BTN passa de 90 pra 101 mãos) porque fold equity de posição não muda com a profundidade do stack — o que muda é só a ferramenta usada pra capturar esse valor, que agora é 100% raise.",
       todo: [
@@ -5997,7 +5997,7 @@ window.RT_DEFAULT_RANGES = {
     },
     {
       id: "9max (36 a 50bb) torneio",
-      nome: "9max (36 a 50bb) torneio",
+      nome: "50 a 36bb",
       descricao:
         "Raise puro segue igual nas outras posições, mas a SB começa a devolver mão forte pro limp",
       why: "De 26-35bb pra cá, UTG a CO praticamente não mudam (41/55/64/81 vs 41/54/64/79) — o RFI de mesa cheia estabiliza cedo e a profundidade do stack deixa de ser o fator principal ali, o que manda é só a posição (quanto mais gente ainda vai agir, mais estreito). O BTN sobe um pouco (101 pra 108) porque o ante segue tornando o steal barato e o stack já aguenta jogar pós-flop se pagarem. A mudança grande é na SB: o raise cai quase pela metade (42 pra 20) e o limp sobe (109 pra 134). Esse é o início de um movimento bem documentado — por volta de 30bb a SB ainda é 'raise puro' com os pares grandes, mas conforme o stack passa dessa marca as mãos premium começam a voltar pro limp, porque um limp com AA/KK contra o BB parece fraqueza e monta um limp-reraise: você ganha muito mais valor deixando o BB pensar que pode dar raise barato do que já avisando a força da mão com um raise direto.",
@@ -7195,7 +7195,7 @@ window.RT_DEFAULT_RANGES = {
     },
     {
       id: "9max (51 a 80bb) torneio",
-      nome: "9max (51 a 80bb) torneio",
+      nome: "80 a 51bb",
       descricao: "UTG aperta um pouco, SB já é quase todo limp",
       why: "Duas coisas se movem aqui em relação a 36-50bb. Primeiro, UTG estreita um pouco (41 pra 38): com o stack mais fundo o SPR pós-flop cresce, e mãos como broadways offsuit marginais ou suited conectores baixos que eram +EV com stack menor passam a sofrer mais de reverse implied odds — quando você acerta um pouco (ex: um par médio no flop) contra o range forte que te paga de UTG, você tende a estar dominado, e o stack fundo faz esse erro custar mais caro. É o mesmo motivo clássico de mesa cheia em cash: UTG aperta com stack fundo pra evitar ficar preso em pote grande com mão dominada. Segundo, a SB continua a virada que começou em 36-50bb: raise cai de 20 pra 13, limp sobe de 134 pra 145. Quanto mais fundo o stack, mais vale a pena disfarçar mão forte dentro do limp pra puxar um raise do BB e repuxar (limp-reraise) — o ganho de valor de deixar o BB se enforcar sozinho supera o ganho de simplesmente construir pote direto com um raise.",
       todo: [
@@ -8392,7 +8392,7 @@ window.RT_DEFAULT_RANGES = {
     },
     {
       id: "9max (81 a 100bb) torneio",
-      nome: "9max (81 a 100bb) torneio",
+      nome: "100 a 81bb",
       descricao:
         "Praticamente jogo de cash game fundo: UTG no mais tight, SB quase 100% limp",
       why: "Esse é o nível mais fundo da tabela, e ele fecha as duas tendências que vínhamos observando desde 26-35bb. UTG chega no seu ponto mais tight (36 mãos, o mesmo patamar do 8bb- resolvido) — com stack tão fundo, o custo de jogar uma mão dominada fora de posição contra o resto da mesa é alto demais, então só sobra o range que já é bom o bastante pra não depender de acertar exatamente a carta certa no flop. LJ/HJ/CO/BTN seguem estáveis (55/65/82/108) porque a posição continua sendo o fator dominante ali, não a profundidade. Na SB, o raise cai pro mínimo histórico da tabela (8 mãos) e o limp bate o teto (150) — a essa profundidade a SB já joga essencialmente como uma mesa de cash game 100bb: limpar a maior parte do range pra entrar barato e disfarçado, e reservar só o topo do topo (tipo AA/KK/AKs) pra um raise direto ou pra ocasionalmente saltar na frente. É o efeito 'limp-reraise' levado ao extremo — quanto mais fundo o stack, mais suave e mais lucrativo fica esconder força atrás de uma ação que parece fraca.",
