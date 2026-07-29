@@ -167,5 +167,49 @@ button.player-slot:active { background: var(--surface-2); }
 .stat-mode-label strong { color: var(--accent); font-weight: 600; }
 
 @media (max-width: 768px) {
-  .players-selection-grid { grid-template-columns: 1fr; }
+  .players-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+
+  .player-slot {
+    padding: 6px;
+    gap: 4px;
+  }
+
+  .player-slot .p-cards .card {
+    width: 40px;
+    height: 56px;
+  }
+
+  .player-slot .p-cards .card .rank {
+    font-size: 9px;
+  }
+
+  .player-slot .p-cards .card .suit-big {
+    font-size: 14px;
+  }
+
+  .players-selection-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+
+  .player-hand {
+    padding: 8px;
+    gap: 6px;
+  }
+
+  .card-btn {
+    width: 60px;
+    height: 84px;
+  }
+
+  .card-btn .card .rank {
+    font-size: 14px;
+  }
+
+  .card-btn .card .suit-big {
+    font-size: 16px;
+  }
 }
