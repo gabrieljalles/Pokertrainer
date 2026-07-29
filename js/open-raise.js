@@ -4,6 +4,16 @@
 (function () {
   "use strict";
 
+  var SPEED_WRONG_PAUSE_MS = 3000;
+  var speedWrongTimer = null;
+
+  function clearSpeedWrongTimer() {
+    if (speedWrongTimer) {
+      clearTimeout(speedWrongTimer);
+      speedWrongTimer = null;
+    }
+  }
+
   var HISTORY_STORAGE_KEY = "rt_history_v1";
   var BEST_STREAK_KEY = "rt_best_streak_v1";
   var Storage = RT.storage;
@@ -70,20 +80,29 @@
   }
 
   /* Remove e devolve a entrada mais atrasada da fila que já está no prazo
-     (dueAtRound <= rounds jogados até agora). Uma por mão sorteada. */
+     (dueAtRound <= rounds jogados até agora). Uma por mão sorteada.
+     Só considera entradas cujo blind e posição ainda estejam selecionados
+     na sessão atual — senão a fila reintroduziria blinds/posições que o
+     usuário desmarcou. Entradas fora da seleção continuam na fila, esperando
+     por uma sessão futura que as inclua. */
   function pickDueRetryEntry() {
     var queue = state.retryQueue;
     var dueIdx = -1;
     for (var i = 0; i < queue.length; i++) {
-      if (queue[i].dueAtRound <= state.roundsPlayed) {
-        if (dueIdx === -1 || queue[i].dueAtRound < queue[dueIdx].dueAtRound)
+      var entry = queue[i];
+      if (
+        entry.dueAtRound <= state.roundsPlayed &&
+        state.selectedBlindIds.indexOf(entry.blindId) !== -1 &&
+        state.selectedPositions.indexOf(entry.position) !== -1
+      ) {
+        if (dueIdx === -1 || entry.dueAtRound < queue[dueIdx].dueAtRound)
           dueIdx = i;
       }
     }
     if (dueIdx === -1) return null;
-    var entry = queue.splice(dueIdx, 1)[0];
+    var picked = queue.splice(dueIdx, 1)[0];
     saveRetryQueue(queue);
-    return entry;
+    return picked;
   }
 
   function pushRetryEntry(round, stage) {
@@ -348,8 +367,26 @@
         correct: correct,
       };
       state.showPrevHand = false;
-      dealNewHand();
+
+      if (correct) {
+        dealNewHand();
+        render();
+        return;
+      }
+
+      state.lastResult = {
+        correct: false,
+        correctAnswer: round.correctAnswer,
+        handClass: round.handClass,
+        position: round.position,
+      };
       render();
+      clearSpeedWrongTimer();
+      speedWrongTimer = setTimeout(function () {
+        speedWrongTimer = null;
+        dealNewHand();
+        render();
+      }, SPEED_WRONG_PAUSE_MS);
       return;
     }
 
@@ -1000,6 +1037,7 @@
       render();
     } else if (action === "start-session") {
       if (el.hasAttribute("disabled")) return;
+      clearSpeedWrongTimer();
       state.session = { total: 0, correct: 0 };
       state.streak = 0;
       state.previousRound = null;
@@ -1010,6 +1048,7 @@
     } else if (action === "answer") {
       handleAnswer(el.getAttribute("data-answer"));
     } else if (action === "next-hand") {
+      clearSpeedWrongTimer();
       dealNewHand();
       render();
     } else if (action === "toggle-range-grid") {
@@ -1023,6 +1062,7 @@
       state.showPrevHand = false;
       render();
     } else if (action === "end-session") {
+      clearSpeedWrongTimer();
       state.screen = "config";
       render();
     } else if (action === "clear-history") {
