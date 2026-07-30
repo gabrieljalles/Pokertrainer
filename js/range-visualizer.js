@@ -48,7 +48,7 @@
     var allHands = 169;
     var stats = {
       allin: actions.allin.length,
-      raise: actions.raise.length,
+      raise: actions.raise.length + actions.range.length,
       call: actions.call.length,
       fold: 0
     };
@@ -364,7 +364,7 @@
     var RANKS = ['A', 'K', 'Q', 'J', 'T', '9', '8', '7', '6', '5', '4', '3', '2'];
     var actions = getRangeActions(blind, position, gameMode);
     var allCombos = actions.allin;
-    var raiseCombos = actions.raise;
+    var raiseCombos = actions.raise.concat(actions.range);
     var callCombos = actions.call;
     var hasData = allCombos.length > 0 || raiseCombos.length > 0 || callCombos.length > 0;
 
@@ -373,7 +373,7 @@
       for (var j = 0; j < RANKS.length; j++) {
         var r1 = RANKS[i];
         var r2 = RANKS[j];
-        var combo = r1 === r2 ? r1 + r2 : (i < j ? r1 + r2 + 's' : r1 + r2 + 'o');
+        var combo = r1 === r2 ? r1 + r2 : (i < j ? r1 + r2 + 's' : r2 + r1 + 'o');
 
         var action = 'empty';
         if (!hasData) {
@@ -396,8 +396,8 @@
   }
 
   function renderCompareDifferences(actions1, actions2, blind1, pos1, blind2, pos2) {
-    var allHands1 = actions1.allin.concat(actions1.raise).concat(actions1.call);
-    var allHands2 = actions2.allin.concat(actions2.raise).concat(actions2.call);
+    var allHands1 = actions1.allin.concat(actions1.raise).concat(actions1.call).concat(actions1.range);
+    var allHands2 = actions2.allin.concat(actions2.raise).concat(actions2.call).concat(actions2.range);
 
     var onlyIn1 = allHands1.filter(function(h) { return allHands2.indexOf(h) === -1; });
     var onlyIn2 = allHands2.filter(function(h) { return allHands1.indexOf(h) === -1; });
@@ -439,7 +439,7 @@
       for (var j = 0; j < RANKS.length; j++) {
         var r1 = RANKS[i];
         var r2 = RANKS[j];
-        var combo = r1 === r2 ? r1 + r2 : (i < j ? r1 + r2 + 's' : r1 + r2 + 'o');
+        var combo = r1 === r2 ? r1 + r2 : (i < j ? r1 + r2 + 's' : r2 + r1 + 'o');
 
         var cssClass = 'range-cell';
         if (targetList.indexOf(combo) !== -1) {
@@ -479,6 +479,7 @@
       state.selectedTipo = el.value;
       state.selectedBlindId = null;
       state.selectedPosition = null;
+      state.compareMode = { blind1Id: null, position1: null, blind2Id: null, position2: null };
       render();
     }
     else if (action === 'select-blind') {
@@ -533,6 +534,7 @@
     else if (action === 'go-compare') {
       state.screen = 'compare-config';
       state.selectedTipo = null;
+      state.compareMode = { blind1Id: null, position1: null, blind2Id: null, position2: null };
       render();
     }
     else if (action === 'go-back') {

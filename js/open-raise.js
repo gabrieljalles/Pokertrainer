@@ -16,11 +16,16 @@
 
   var HISTORY_STORAGE_KEY = "rt_history_v1";
   var BEST_STREAK_KEY = "rt_best_streak_v1";
+  var FSRS_MAP_KEY = "rt_openraise_fsrs_v1";
+  var ROUND_COUNTER_KEY = "rt_openraise_roundcount_v1";
+  var OLD_RETRY_QUEUE_KEY = "rt_openraise_retry_v1"; // removido, mas limpamos se existir
+
   var Storage = RT.storage;
   var Cards = RT.cards;
   var Ranges = RT.ranges;
   var UI = RT.ui;
   var Table = RT.pokerTable;
+  var FSRS = RT.fsrs;
 
   function loadHistory() {
     var raw = Storage.get(HISTORY_STORAGE_KEY);
@@ -38,32 +43,19 @@
     return isNaN(n) ? 0 : n;
   }
 
-  /* ---------- Memória de erros (repetição espaçada) ----------
-     Toda mão errada (modo rápido ou lento) fica numa fila e volta a
-     aparecer, com as mesmas cartas/posição/blind, alguns rounds depois —
-     tudo em localStorage, sem precisar de login. Escada de 3 estágios:
-       errou (qualquer estágio)      -> estágio 1, reaparece em 4-6 rounds
-       acertou no estágio 1          -> estágio 2, reaparece em 12-18 rounds
-       acertou no estágio 2          -> estágio 3, reaparece em 36 rounds (última vez)
-       acertou no estágio 3          -> dominado, sai da fila
-       acertou um round normal (não vindo da fila) -> não guarda nada */
-  var RETRY_QUEUE_KEY = "rt_openraise_retry_v1";
-  var ROUND_COUNTER_KEY = "rt_openraise_roundcount_v1";
-  var RETRY_STAGE_ROUNDS = { 1: [4, 6], 2: [12, 18], 3: [36, 36] };
-
-  function loadRetryQueue() {
-    var raw = Storage.get(RETRY_QUEUE_KEY);
-    if (!raw) return [];
+  function loadFsrsMap() {
+    var raw = Storage.get(FSRS_MAP_KEY);
+    if (!raw) return {};
     try {
-      var arr = JSON.parse(raw);
-      return Array.isArray(arr) ? arr : [];
+      var obj = JSON.parse(raw);
+      return typeof obj === 'object' ? obj : {};
     } catch (e) {
-      return [];
+      return {};
     }
   }
 
-  function saveRetryQueue(queue) {
-    Storage.set(RETRY_QUEUE_KEY, JSON.stringify(queue));
+  function saveFsrsMap(map) {
+    Storage.set(FSRS_MAP_KEY, JSON.stringify(map));
   }
 
   function loadRoundCounter() {
@@ -75,62 +67,98 @@
     Storage.set(ROUND_COUNTER_KEY, String(n));
   }
 
+  /* Remove storage antigo de fila de repetição (3 estágios). Chamado uma vez
+     na inicialização pra fazer limpeza. */
+  function cleanupOldRetryQueue() {
+    if (Storage.hasOwnProperty(OLD_RETRY_QUEUE_KEY)) {
+      Storage.remove(OLD_RETRY_QUEUE_KEY);
+    }
+  }
+
   function randBetween(min, max) {
     return min + Math.floor(Math.random() * (max - min + 1));
   }
 
-  /* Remove e devolve a entrada mais atrasada da fila que já está no prazo
-     (dueAtRound <= rounds jogados até agora). Uma por mão sorteada.
-     Só considera entradas cujo blind e posição ainda estejam selecionados
-     na sessão atual — senão a fila reintroduziria blinds/posições que o
-     usuário desmarcou. Entradas fora da seleção continuam na fila, esperando
-     por uma sessão futura que as inclua. */
-  function pickDueRetryEntry() {
-    var queue = state.retryQueue;
-    var dueIdx = -1;
-    for (var i = 0; i < queue.length; i++) {
-      var entry = queue[i];
-      if (
-        entry.dueAtRound <= state.roundsPlayed &&
-        state.selectedBlindIds.indexOf(entry.blindId) !== -1 &&
-        state.selectedPositions.indexOf(entry.position) !== -1
-      ) {
-        if (dueIdx === -1 || entry.dueAtRound < queue[dueIdx].dueAtRound)
-          dueIdx = i;
+  /* Extrai os limites de bb efetivos do nome do nível de blind (ex.: "35 a
+     26bb" -> {min:26, max:35}, "8bb-" -> {min:8, max:8}) pra sortear um
+     valor aleatório dentro da faixa a cada mão. */
+  function parseBlindBBRange(nome) {
+    var rangeMatch = nome.match(/(\d+)\s*a\s*(\d+)\s*bb/i);
+    if (rangeMatch) {
+      var a = parseInt(rangeMatch[1], 10),
+        b = parseInt(rangeMatch[2], 10);
+      return { min: Math.min(a, b), max: Math.max(a, b) };
+    }
+    var singleMatch = nome.match(/(\d+)\s*bb/i);
+    if (singleMatch) {
+      var n = parseInt(singleMatch[1], 10);
+      return { min: n, max: n };
+    }
+    return null;
+  }
+
+  function randomEffectiveBB(nome) {
+    var range = parseBlindBBRange(nome);
+    if (!range) return "";
+    return String(randBetween(range.min, range.max)) + "bb";
+  }
+
+  /* Gera todas as 169 classes de mão (13x13), reusando a mesma ordem de
+     ranks usada em renderRangeGrid. */
+  function allHandClasses() {
+    var RANKS = ['A', 'K', 'Q', 'J', 'T', '9', '8', '7', '6', '5', '4', '3', '2'];
+    var classes = [];
+    for (var i = 0; i < RANKS.length; i++) {
+      for (var j = 0; j < RANKS.length; j++) {
+        var r1 = RANKS[i];
+        var r2 = RANKS[j];
+        var combo = r1 === r2 ? r1 + r2 : (i < j ? r1 + r2 + 's' : r1 + r2 + 'o');
+        classes.push(combo);
       }
     }
-    if (dueIdx === -1) return null;
-    var picked = queue.splice(dueIdx, 1)[0];
-    saveRetryQueue(queue);
-    return picked;
+    return classes;
   }
 
-  function pushRetryEntry(round, stage) {
-    var range = RETRY_STAGE_ROUNDS[stage];
-    var entry = {
-      blindId: round.blindId,
-      position: round.position,
-      c1: round.c1,
-      c2: round.c2,
-      handClass: round.handClass,
-      stage: stage,
-      dueAtRound: state.roundsPlayed + randBetween(range[0], range[1]),
-    };
-    state.retryQueue.push(entry);
-    saveRetryQueue(state.retryQueue);
+  /* Calcula o peso de sorteio (0-1) para uma combinação (blindId, position, handClass)
+     baseado na retrievability FSRS. Mãos com retrievability baixa (não dominadas)
+     têm peso alto; mãos dominadas têm peso mínimo (MIN_WEIGHT).
+     A fórmula é: weight = clamp(1 - R, MIN_WEIGHT, 1), onde R é retrievability. */
+  function getHandWeight(fsrsMap, blindId, position, handClass, currentRound) {
+    var key = blindId + '|' + position + '|' + handClass;
+    var card = fsrsMap[key] || FSRS.createEmptyCard();
+    var retrievability = FSRS.retrievability(card, currentRound);
+    var weight = 1 - retrievability;
+    return Math.max(FSRS.MIN_WEIGHT, Math.min(1, weight));
   }
 
-  /* Decide o que fazer com a fila de repetição após a resposta do usuário.
-     round.retryStage é 0 pra mão sorteada normalmente, ou 1/2/3 se ela veio
-     da fila de repetição. */
-  function resolveRetryOutcome(round, correct) {
-    if (!correct) {
-      pushRetryEntry(round, 1);
-      return;
+  /* Sorteio ponderado: dado um array de [value, weight, ...] pairs,
+     escolhe um valor conforme os pesos (roleta cumulativa). */
+  function weightedPick(candidates, currentRound, fsrsMap) {
+    // Calcula pesos e acumula
+    var totalWeight = 0;
+    var weights = [];
+    for (var i = 0; i < candidates.length; i++) {
+      var c = candidates[i];
+      var w = getHandWeight(fsrsMap, c.blindId, c.position, c.handClass, currentRound);
+      weights.push(w);
+      totalWeight += w;
     }
-    if (round.retryStage === 1) pushRetryEntry(round, 2);
-    else if (round.retryStage === 2) pushRetryEntry(round, 3);
-    /* estágio 3 acertado, ou acerto de mão normal (retryStage 0): nada a guardar */
+
+    if (totalWeight === 0) {
+      // Fallback seguro (não deveria acontecer)
+      return candidates[Math.floor(Math.random() * candidates.length)];
+    }
+
+    var roll = Math.random() * totalWeight;
+    var cumulative = 0;
+    for (var i = 0; i < candidates.length; i++) {
+      cumulative += weights[i];
+      if (roll <= cumulative) {
+        return candidates[i];
+      }
+    }
+
+    return candidates[candidates.length - 1];
   }
 
   function unionPositions(blinds) {
@@ -173,11 +201,14 @@
     previousRound: null,
     showPrevHand: false,
     showRangeGrid: false,
-    retryQueue: loadRetryQueue(),
+    fsrsMap: loadFsrsMap(),
     roundsPlayed: loadRoundCounter(),
     history: loadHistory(),
     importMessage: null,
   };
+
+  // Cleanup de armazenamento antigo
+  cleanupOldRetryQueue();
 
   function recordAttempt(record) {
     state.history.push(record);
@@ -274,59 +305,93 @@
   function dealNewHand() {
     state.roundsPlayed++;
     saveRoundCounter(state.roundsPlayed);
-    var retryEntry = pickDueRetryEntry();
-    var retryBlind = retryEntry
-      ? Ranges.findBlind(state.rangesData, retryEntry.blindId)
-      : null;
 
-    var blindId, blindNome, position, c1, c2, handClass;
-    if (retryEntry && retryBlind && retryBlind.posicoes[retryEntry.position]) {
-      blindId = retryBlind.id;
-      blindNome = retryBlind.nome;
-      position = retryEntry.position;
-      c1 = retryEntry.c1;
-      c2 = retryEntry.c2;
-      handClass = retryEntry.handClass;
-    } else {
-      retryEntry = null;
-      var blinds = selectedBlinds();
-      var candidates = [];
-      for (var i = 0; i < blinds.length; i++) {
-        for (var j = 0; j < state.selectedPositions.length; j++) {
-          var pos = state.selectedPositions[j];
-          if (blinds[i].posicoes[pos])
-            candidates.push({
-              blindId: blinds[i].id,
-              blindNome: blinds[i].nome,
-              position: pos,
+    // Monta lista de candidatos: todas as combinações (blindId, position, handClass)
+    // que realmente existem nos ranges (raise/call/fold/allin).
+    var blinds = selectedBlinds();
+    var handClasses = allHandClasses();
+    var candidates = [];
+    for (var i = 0; i < blinds.length; i++) {
+      for (var j = 0; j < state.selectedPositions.length; j++) {
+        var pos = state.selectedPositions[j];
+        if (blinds[i].posicoes[pos]) {
+          var blindData = blinds[i];
+          var posData = blindData.posicoes[pos].open_range;
+          if (posData) {
+            // Coleta todas as mãos que estão em algum range (raise/call/fold/allin)
+            var validHands = new Set();
+            if (posData.raise_range) {
+              posData.raise_range.forEach(function(h) { validHands.add(h); });
+            }
+            if (posData.call_range) {
+              posData.call_range.forEach(function(h) { validHands.add(h); });
+            }
+            if (posData.fold_range) {
+              posData.fold_range.forEach(function(h) { validHands.add(h); });
+            }
+            if (posData.allin_range) {
+              posData.allin_range.forEach(function(h) { validHands.add(h); });
+            }
+            // Só inclui mãos que realmente existem
+            validHands.forEach(function(hc) {
+              candidates.push({
+                blindId: blindData.id,
+                blindNome: blindData.nome,
+                position: pos,
+                handClass: hc,
+              });
             });
+          }
         }
       }
-      var choice = candidates[Math.floor(Math.random() * candidates.length)];
+    }
+
+    if (candidates.length === 0) {
+      // Fallback seguro (não deveria acontecer)
+      var blinds = selectedBlinds();
+      var choice = blinds[Math.floor(Math.random() * blinds.length)];
       var pair = Cards.dealTwoCards();
-      blindId = choice.blindId;
-      blindNome = choice.blindNome;
-      position = choice.position;
-      c1 = pair[0];
-      c2 = pair[1];
-      handClass = Cards.getHandClass(c1, c2);
+      state.currentRound = {
+        blindId: choice.id,
+        blindNome: choice.nome,
+        position: state.selectedPositions[0],
+        c1: pair[0],
+        c2: pair[1],
+        handClass: Cards.getHandClass(pair[0], pair[1]),
+        correctAnswer: "fold",
+        effectiveBB: randomEffectiveBB(choice.nome),
+      };
+      state.lastResult = null;
+      state.showRangeGrid = false;
+      return;
+    }
+
+    // Sorteio ponderado por FSRS (mãos difíceis aparecem mais)
+    var choice = weightedPick(candidates, state.roundsPlayed, state.fsrsMap);
+
+    // Sorteia duas cartas concretas da classe escolhida
+    var pair = Cards.dealCardsForClass(choice.handClass);
+    if (!pair) {
+      // Fallback se dealCardsForClass falhar
+      pair = Cards.dealTwoCards();
     }
 
     var correctAnswer = getCorrectAction(
       state.rangesData,
-      blindId,
-      position,
-      handClass,
+      choice.blindId,
+      choice.position,
+      choice.handClass,
     );
+
     state.currentRound = {
-      blindId: blindId,
-      blindNome: blindNome,
-      position: position,
-      c1: c1,
-      c2: c2,
-      handClass: handClass,
+      blindId: choice.blindId,
+      blindNome: choice.blindNome,
+      position: choice.position,
+      c1: pair[0],
+      c2: pair[1],
+      handClass: choice.handClass,
       correctAnswer: correctAnswer,
-      retryStage: retryEntry ? retryEntry.stage : 0,
+      effectiveBB: randomEffectiveBB(choice.blindNome),
     };
     state.lastResult = null;
     state.showRangeGrid = false;
@@ -348,7 +413,14 @@
       correctAnswer: round.correctAnswer,
       correct: correct,
     });
-    resolveRetryOutcome(round, correct);
+
+    // Atualiza FSRS com a resposta
+    var key = round.blindId + '|' + round.position + '|' + round.handClass;
+    var card = state.fsrsMap[key] || FSRS.createEmptyCard();
+    var rating = correct ? 3 : 1; // 3 = Good (acertou), 1 = Again (errou)
+    var updatedCard = FSRS.reviewCard(card, rating, state.roundsPlayed);
+    state.fsrsMap[key] = updatedCard;
+    saveFsrsMap(state.fsrsMap);
 
     if (state.speedMode) {
       state.streak = correct ? state.streak + 1 : 0;
@@ -702,8 +774,7 @@
         : "") +
       "</div>";
 
-    var blindsMatch = round.blindNome.match(/(\d+bb)/i);
-    var blindsInfo = blindsMatch ? blindsMatch[1] : "";
+    var blindsInfo = round.effectiveBB || "";
 
     html += '<div class="game-center">';
     html +=
