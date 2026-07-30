@@ -726,12 +726,26 @@
       '<button class="btn-primary" data-action="start-session" ' +
       (canStart ? "" : "disabled") +
       ">Iniciar treino</button>";
+
+    if (state.importMessage) {
+      html +=
+        '<div class="toast ' +
+        state.importMessage.type +
+        '">' +
+        esc(state.importMessage.text) +
+        "</div>";
+      state.importMessage = null;
+    }
+
     html +=
       '<div class="home-footer">' +
       '<button class="btn-secondary" data-action="go-stats">📊 Histórico</button>' +
       '<button class="btn-secondary" data-action="go-import">⚙️ Ranges</button>' +
+      '<button class="btn-secondary" data-action="export-fsrs" title="Exportar FSRS">⬆️</button>' +
+      '<button class="btn-secondary" data-action="import-fsrs" title="Importar FSRS">⬇️</button>' +
       '<button class="btn-secondary" data-action="go-home">← Menu</button>' +
       "</div>";
+    html += '<input type="file" id="fsrs-file-input" accept=".json,application/json" style="display:none">';
     html += "</div>";
     return html;
   }
@@ -1153,6 +1167,63 @@
         text: "Range padrão restaurado.",
       };
       render();
+    } else if (action === "export-fsrs") {
+      // Exporta o FSRS map como JSON
+      var fsrsData = {
+        version: 1,
+        exported: new Date().toISOString(),
+        fsrsMap: state.fsrsMap,
+      };
+      var dataStr = JSON.stringify(fsrsData, null, 2);
+      var dataBlob = new Blob([dataStr], { type: "application/json" });
+      var url = URL.createObjectURL(dataBlob);
+      var link = document.createElement("a");
+      link.href = url;
+      link.download = "fsrs_backup_" + new Date().toISOString().split('T')[0] + ".json";
+      link.click();
+      URL.revokeObjectURL(url);
+    } else if (action === "import-fsrs") {
+      // Clica no input file hidden pra importar
+      var fileInput = document.getElementById("fsrs-file-input");
+      if (fileInput) fileInput.click();
+    }
+  });
+
+  // Handler para input file de FSRS
+  document.addEventListener("change", function (e) {
+    if (e.target.id === "fsrs-file-input") {
+      var file = e.target.files && e.target.files[0];
+      if (!file) return;
+      var reader = new FileReader();
+      reader.onload = function (ev) {
+        try {
+          var parsed = JSON.parse(ev.target.result);
+          var fsrsData = parsed.fsrsMap || parsed;
+
+          // Valida que é um objeto válido
+          if (typeof fsrsData !== 'object' || fsrsData === null) {
+            alert('Erro: JSON inválido. Esperado um objeto com dados FSRS.');
+            return;
+          }
+
+          // Carrega para o state e localStorage
+          state.fsrsMap = fsrsData;
+          saveFsrsMap(fsrsData);
+
+          state.importMessage = {
+            type: "success",
+            text: "FSRS importado com sucesso! " + Object.keys(fsrsData).length + " cartas carregadas.",
+          };
+          render();
+
+          // Reset do input
+          e.target.value = '';
+        } catch (err) {
+          alert('Erro ao ler arquivo: ' + err.message);
+          e.target.value = '';
+        }
+      };
+      reader.readAsText(file);
     }
   });
 
