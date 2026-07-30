@@ -1168,10 +1168,11 @@
       };
       render();
     } else if (action === "export-fsrs") {
-      // Exporta o FSRS map como JSON
+      // Exporta o FSRS map com roundsPlayed (necessário pra restaurar timeline correta)
       var fsrsData = {
         version: 1,
         exported: new Date().toISOString(),
+        roundsPlayed: state.roundsPlayed,
         fsrsMap: state.fsrsMap,
       };
       var dataStr = JSON.stringify(fsrsData, null, 2);
@@ -1198,7 +1199,10 @@
       reader.onload = function (ev) {
         try {
           var parsed = JSON.parse(ev.target.result);
+
+          // Tenta extrair fsrsMap e roundsPlayed do arquivo de backup
           var fsrsData = parsed.fsrsMap || parsed;
+          var importedRoundsPlayed = parsed.roundsPlayed || 0;
 
           // Valida que é um objeto válido
           if (typeof fsrsData !== 'object' || fsrsData === null) {
@@ -1208,11 +1212,13 @@
 
           // Carrega para o state e localStorage
           state.fsrsMap = fsrsData;
+          state.roundsPlayed = importedRoundsPlayed;
           saveFsrsMap(fsrsData);
+          saveRoundCounter(importedRoundsPlayed);
 
           state.importMessage = {
             type: "success",
-            text: "FSRS importado com sucesso! " + Object.keys(fsrsData).length + " cartas carregadas.",
+            text: "FSRS importado com sucesso! " + Object.keys(fsrsData).length + " cartas, timeline em round " + importedRoundsPlayed,
           };
           render();
 
