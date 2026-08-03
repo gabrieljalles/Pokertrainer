@@ -221,3 +221,16 @@ details.detail-block summary {
 .toast.success { background: var(--success-bg); color: var(--success); border: 1px solid var(--success); }
 .toast.error { background: var(--danger-bg); color: var(--danger); border: 1px solid var(--danger); }
 .toast.warning { background: rgba(216, 180, 117, 0.14); color: var(--accent); border: 1px solid var(--accent); }
+
+/* ---------- Gráfico de histórico diário ---------- */
+.daily-filters { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
+.daily-filters > div { display: flex; flex-direction: column; gap: 6px; }
+.daily-filters label { font-size: 12px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.05em; }
+.daily-filters select {
+  background: var(--surface); border: 1.5px solid var(--border-soft); border-radius: 10px;
+  padding: 10px 12px; color: var(--text); font-size: 13px; font-family: inherit; cursor: pointer;
+}
+.daily-filters select:focus { outline: none; border-color: var(--accent); }
+
+.chart-container { position: relative; height: 300px; margin-bottom: 20px; width: 100%; }
+.chart-container canvas { max-height: 300px; }

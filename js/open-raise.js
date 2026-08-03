@@ -193,7 +193,7 @@
     selectedPositions: [],
     speedMode: false,
     expandedBlindId: null,
-    session: { total: 0, correct: 0 },
+    session: { total: 0, correct: 0, touchedKeys: {} },
     streak: 0,
     bestStreak: loadBestStreak(),
     currentRound: null,
@@ -201,14 +201,53 @@
     previousRound: null,
     showPrevHand: false,
     showRangeGrid: false,
+    lastSessionSummary: null,
     fsrsMap: loadFsrsMap(),
     roundsPlayed: loadRoundCounter(),
     history: loadHistory(),
+    dailyStats: [],
+    dailyStatsFilterBlind: null,
+    dailyStatsFilterPosition: null,
     importMessage: null,
   };
 
   // Cleanup de armazenamento antigo
   cleanupOldRetryQueue();
+
+  // Computa stats diários a partir do histórico
+  function computeDailyStats(history) {
+    var dailyMap = {};
+    for (var i = 0; i < history.length; i++) {
+      var h = history[i];
+      var date = new Date(h.ts).toISOString().split('T')[0]; // YYYY-MM-DD
+      var key = date + '|' + h.blindNome + '|' + h.position;
+
+      if (!dailyMap[key]) {
+        dailyMap[key] = { date: date, blind: h.blindNome, position: h.position, attempts: 0, correct: 0 };
+      }
+      dailyMap[key].attempts++;
+      if (h.correct) dailyMap[key].correct++;
+    }
+
+    // Converte pra array e calcula accuracy
+    var stats = [];
+    var keys = Object.keys(dailyMap);
+    for (var j = 0; j < keys.length; j++) {
+      var s = dailyMap[keys[j]];
+      s.accuracy = s.attempts > 0 ? Math.round((s.correct / s.attempts) * 100) : 0;
+      stats.push(s);
+    }
+
+    // Ordena por data
+    stats.sort(function (a, b) {
+      return new Date(a.date) - new Date(b.date);
+    });
+
+    return stats;
+  }
+
+  // Inicializa dailyStats
+  state.dailyStats = computeDailyStats(state.history);
 
   function recordAttempt(record) {
     state.history.push(record);
@@ -995,6 +1034,8 @@
     html += "</div></details>";
 
     html +=
+      '<button class="btn-primary" data-action="go-daily-stats">📈 Progresso Diário</button>';
+    html +=
       '<button class="danger-link" data-action="clear-history">Limpar histórico</button>';
     html +=
       '<div class="home-footer"><button class="btn-secondary" data-action="go-home">← Voltar ao Menu</button></div>';
@@ -1062,10 +1103,16 @@
       case "import":
         html = renderImport();
         break;
+      case "daily-stats":
+        html = DailyStatsGraph.render(state.dailyStats, state.dailyStatsFilterBlind, state.dailyStatsFilterPosition, Ranges, esc);
+        break;
       default:
         html = renderHome();
     }
     app.innerHTML = html;
+    if (state.screen === "daily-stats" && DailyStatsGraph) {
+      DailyStatsGraph.afterRender(state.dailyStats, state.dailyStatsFilterBlind, state.dailyStatsFilterPosition);
+    }
   }
 
   /* ================= Eventos ================= */
@@ -1098,6 +1145,9 @@
     } else if (action === "go-import") {
       state.screen = "import";
       state.importMessage = null;
+      render();
+    } else if (action === "go-daily-stats") {
+      state.screen = "daily-stats";
       render();
     } else if (action === "toggle-all-blinds") {
       var allBlinds = Ranges.blindsByTipo(state.rangesData, state.selectedTipo);
@@ -1148,6 +1198,8 @@
       render();
     } else if (action === "end-session") {
       clearSpeedWrongTimer();
+      // Atualiza stats diários após sessão
+      state.dailyStats = computeDailyStats(state.history);
       state.screen = "config";
       render();
     } else if (action === "clear-history") {
@@ -1168,12 +1220,14 @@
       };
       render();
     } else if (action === "export-fsrs") {
-      // Exporta o FSRS map com roundsPlayed (necessário pra restaurar timeline correta)
+      // Exporta FSRS + metadata + stats diários
       var fsrsData = {
         version: 1,
         exported: new Date().toISOString(),
         roundsPlayed: state.roundsPlayed,
+        bestStreak: state.bestStreak,
         fsrsMap: state.fsrsMap,
+        dailyStats: state.dailyStats,
       };
       var dataStr = JSON.stringify(fsrsData, null, 2);
       var dataBlob = new Blob([dataStr], { type: "application/json" });
@@ -1200,9 +1254,11 @@
         try {
           var parsed = JSON.parse(ev.target.result);
 
-          // Tenta extrair fsrsMap e roundsPlayed do arquivo de backup
+          // Tenta extrair dados do arquivo de backup
           var fsrsData = parsed.fsrsMap || parsed;
           var importedRoundsPlayed = parsed.roundsPlayed || 0;
+          var importedBestStreak = parsed.bestStreak || 0;
+          var importedDailyStats = parsed.dailyStats || [];
 
           // Valida que é um objeto válido
           if (typeof fsrsData !== 'object' || fsrsData === null) {
@@ -1213,12 +1269,15 @@
           // Carrega para o state e localStorage
           state.fsrsMap = fsrsData;
           state.roundsPlayed = importedRoundsPlayed;
+          state.bestStreak = importedBestStreak;
+          state.dailyStats = importedDailyStats;
           saveFsrsMap(fsrsData);
           saveRoundCounter(importedRoundsPlayed);
+          Storage.set(BEST_STREAK_KEY, String(importedBestStreak));
 
           state.importMessage = {
             type: "success",
-            text: "FSRS importado com sucesso! " + Object.keys(fsrsData).length + " cartas, timeline em round " + importedRoundsPlayed,
+            text: "FSRS importado! " + Object.keys(fsrsData).length + " cartas, round " + importedRoundsPlayed + ", streak " + importedBestStreak + ", " + importedDailyStats.length + " dias de histórico",
           };
           render();
 
@@ -1255,6 +1314,14 @@
       if (idx === -1) state.selectedPositions.push(pos);
       else state.selectedPositions.splice(idx, 1);
       render();
+    } else if (action === "filter-blind") {
+      state.dailyStatsFilterBlind = el.value || null;
+      render();
+      if (DailyStatsGraph) DailyStatsGraph.afterRender(state.dailyStats, state.dailyStatsFilterBlind, state.dailyStatsFilterPosition);
+    } else if (action === "filter-position") {
+      state.dailyStatsFilterPosition = el.value || null;
+      render();
+      if (DailyStatsGraph) DailyStatsGraph.afterRender(state.dailyStats, state.dailyStatsFilterBlind, state.dailyStatsFilterPosition);
     } else if (action === "toggle-speed-mode") {
       state.speedMode = el.checked;
       render();
